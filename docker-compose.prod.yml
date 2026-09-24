@@ -1,7 +1,6 @@
 # Produção — Coolify (Docker Compose)
-# No Coolify: New Resource → Docker Compose → este repositório / docker-compose.prod.yml
-# Atribua domínios aos serviços api (3001), admin (3000) e storefront (3002).
-# Vitrine: domínio wildcard *.seudominio.com → storefront.
+# Domínios na UI: api→3001, admin→3000, storefront→3002
+# Marque também "Connect To Predefined Network" no Coolify.
 
 services:
   postgres:
@@ -22,6 +21,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+    networks:
+      - internal
 
   redis:
     image: redis:7-alpine
@@ -34,6 +35,8 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    networks:
+      - internal
 
   api:
     build:
@@ -68,6 +71,9 @@ services:
       - uploads_data:/app/uploads
     expose:
       - "3001"
+    networks:
+      - internal
+      - coolify
 
   admin:
     build:
@@ -84,6 +90,9 @@ services:
       HOSTNAME: 0.0.0.0
     expose:
       - "3000"
+    networks:
+      - internal
+      - coolify
 
   storefront:
     build:
@@ -104,8 +113,17 @@ services:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     expose:
       - "3002"
+    networks:
+      - internal
+      - coolify
 
 volumes:
   postgres_data:
   redis_data:
   uploads_data:
+
+networks:
+  internal:
+    driver: bridge
+  coolify:
+    external: true
