@@ -63,8 +63,8 @@ services:
       N8N_ALERTS_WEBHOOK_URL: ${N8N_ALERTS_WEBHOOK_URL:-}
     volumes:
       - uploads_data:/app/uploads
-    ports:
-      - "${API_PUBLISH_PORT:-3001}:3001"
+    expose:
+      - "3001"
 
   admin:
     build:
@@ -79,8 +79,8 @@ services:
       NODE_ENV: production
       PORT: 3000
       HOSTNAME: 0.0.0.0
-    ports:
-      - "${ADMIN_PUBLISH_PORT:-3000}:3000"
+    expose:
+      - "3000"
 
   storefront:
     build:
@@ -99,8 +99,8 @@ services:
       ROOT_DOMAIN: ${ROOT_DOMAIN}
       NEXT_PUBLIC_ROOT_DOMAIN: ${ROOT_DOMAIN}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
-    ports:
-      - "${STOREFRONT_PUBLISH_PORT:-3002}:3002"
+    expose:
+      - "3002"
 
 volumes:
   postgres_data:

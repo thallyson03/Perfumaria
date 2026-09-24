@@ -26,12 +26,8 @@ Este monorepo sobe com **Docker Compose** (`docker-compose.prod.yml`).
 | `JWT_SECRET` | `openssl rand -base64 48` |
 | `N8N_ALERTS_WEBHOOK_URL` | (opcional) webhook n8n |
 
-4. Domínios / proxy (por serviço):
-   - **api** → `api.seudominio.com` (porta **3001**)
-   - **admin** → `admin.seudominio.com` (porta **3000**)
-   - **storefront** → `lojas.seudominio.com` **e** `*.lojas.seudominio.com` (porta **3002**)
-5. Ative HTTPS (Let's Encrypt) nos três.
-6. Deploy.
+Na Coolify, **não** publique portas no host (`ports:`). O proxy acessa os containers pela rede interna (`expose`). Domínios são atribuídos na UI por serviço (api 3001, admin 3000, storefront 3002).
+
 
 Na primeira subida a API roda `prisma migrate deploy` e sincroniza a senha do role `revendedor_app`.
 
