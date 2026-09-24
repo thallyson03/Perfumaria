@@ -1,6 +1,11 @@
 # Produção — Coolify (Docker Compose)
-# Domínios na UI: api→3001, admin→3000, storefront→3002
-# Marque também "Connect To Predefined Network" no Coolify.
+#
+# Domínios na UI (porta = porta INTERNA do container):
+#   api:        https://api.seudominio.com:3001
+#   admin:      https://admin.seudominio.com:3000
+#   storefront: https://lojas.seudominio.com:3002
+#
+# Marque "Connect To Predefined Network" no Coolify (não declare rede coolify aqui).
 
 services:
   postgres:
@@ -21,8 +26,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
-    networks:
-      - internal
 
   redis:
     image: redis:7-alpine
@@ -35,8 +38,6 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
-    networks:
-      - internal
 
   api:
     build:
@@ -71,9 +72,12 @@ services:
       - uploads_data:/app/uploads
     expose:
       - "3001"
-    networks:
-      - internal
-      - coolify
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
   admin:
     build:
@@ -90,9 +94,12 @@ services:
       HOSTNAME: 0.0.0.0
     expose:
       - "3000"
-    networks:
-      - internal
-      - coolify
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   storefront:
     build:
@@ -113,17 +120,14 @@ services:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     expose:
       - "3002"
-    networks:
-      - internal
-      - coolify
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3002/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
 volumes:
   postgres_data:
   redis_data:
   uploads_data:
-
-networks:
-  internal:
-    driver: bridge
-  coolify:
-    external: true
