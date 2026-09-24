@@ -7,6 +7,7 @@ import {
   releaseBatchReservation,
   reserveBatchStock,
 } from "../services/stock.js";
+import { allocateKitComponents } from "../services/kit.js";
 
 export const RESERVE_TTL_SECONDS = Number(
   process.env.CART_RESERVE_TTL_SECONDS ?? 900
@@ -217,4 +218,115 @@ export const cartRoutes: FastifyPluginAsync = async (app) => {
 
     return { ok: true, released: parsed.data.items.length };
   });
+
+  /**
+   * Reserva (ou troca) um kit: libera componentes anteriores e aloca lotes FIFO
+   * dos componentes com preço rateado do kit.
+   */
+  app.post(
+    "/reserve-kit",
+    {
+      config: {
+        rateLimit: { max: 20, timeWindow: "1 minute" },
+      },
+    },
+    async (req, reply) => {
+      const schema = z.object({
+        cartId: z.string().min(8).max(80).optional(),
+        kitProductId: z.string().uuid(),
+        quantity: z.number().int().min(0).max(20),
+        previousComponents: z
+          .array(
+            z.object({
+              batchId: z.string().uuid(),
+              quantity: z.number().int().positive().max(100),
+            })
+          )
+          .max(60)
+          .optional()
+          .default([]),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return reply.status(400).send({ error: parsed.error.flatten() });
+      }
+
+      const tenantId = req.tenantId!;
+      const cartId = parsed.data.cartId ?? randomUUID();
+      const redis = getRedis();
+      const previous = parsed.data.previousComponents ?? [];
+
+      try {
+        const allocation = await withTenant(prisma, tenantId, async (tx) => {
+          for (const item of previous) {
+            await releaseBatchReservation(tx, item.batchId, item.quantity);
+          }
+
+          if (parsed.data.quantity === 0) {
+            return null;
+          }
+
+          const result = await allocateKitComponents(
+            tx,
+            parsed.data.kitProductId,
+            parsed.data.quantity
+          );
+          for (const line of result.components) {
+            const ok = await reserveBatchStock(tx, line.batchId, line.quantity);
+            if (!ok) {
+              throw Object.assign(new Error("Estoque insuficiente no kit"), {
+                statusCode: 409,
+              });
+            }
+          }
+          return result;
+        });
+
+        for (const item of previous) {
+          await redis.del(
+            reserveRedisKey(tenantId, item.batchId, cartId, item.quantity)
+          );
+        }
+
+        if (!allocation) {
+          return {
+            ok: true,
+            cartId,
+            quantity: 0,
+            components: [],
+          };
+        }
+
+        for (const line of allocation.components) {
+          const key = reserveRedisKey(
+            tenantId,
+            line.batchId,
+            cartId,
+            line.quantity
+          );
+          await redis.set(key, "1", "EX", RESERVE_TTL_SECONDS);
+        }
+
+        return {
+          ok: true,
+          cartId,
+          kitProductId: allocation.kitProductId,
+          kitName: allocation.kitName,
+          quantity: allocation.kitQuantity,
+          unitPrice: allocation.unitPrice,
+          availableKits: allocation.availableKits,
+          components: allocation.components,
+          expiresInSeconds: RESERVE_TTL_SECONDS,
+        };
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Falha ao reservar kit";
+        const status =
+          err && typeof err === "object" && "statusCode" in err
+            ? Number((err as { statusCode: number }).statusCode)
+            : 400;
+        return reply.status(status).send({ error: message });
+      }
+    }
+  );
 };

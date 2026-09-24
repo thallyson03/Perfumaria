@@ -36,6 +36,10 @@ export const ORDER_PAYMENT_TTL_SECONDS = Number(
 export type OrderItemInput = {
   batchId: string;
   quantity: number;
+  /** Preço unitário (kits: preço rateado). Se omitido, usa preço do produto do lote. */
+  unitPrice?: number;
+  /** Nome exibido (kits: "Kit · Componente"). */
+  productName?: string;
 };
 
 export type OrderFulfillmentInput = {
@@ -197,14 +201,18 @@ async function reserveOrderItems(
       throw Object.assign(new Error("Produto indisponível"), { statusCode: 400 });
     }
 
-    const unitPrice = getEffectivePrice(batch.product);
+    const unitPrice =
+      item.unitPrice != null && Number.isFinite(item.unitPrice)
+        ? Number(item.unitPrice)
+        : getEffectivePrice(batch.product);
+    const productName = item.productName?.trim() || batch.product.name;
     lineItems.push({
       batchId: item.batchId,
       productId: batch.productId,
-      productName: batch.product.name,
+      productName,
       quantity: item.quantity,
       unitPrice,
-      lineTotal: unitPrice * item.quantity,
+      lineTotal: Number((unitPrice * item.quantity).toFixed(2)),
     });
   }
 

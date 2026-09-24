@@ -1,18 +1,25 @@
 import {
   adjustCartLine,
   releaseAllCartLines,
+  reserveKit,
   type CartLinePayload,
+  type KitComponentLine,
 } from "@/lib/cart-api";
 
 export type CartItem = {
+  /** Chave estável da linha na sacola */
+  lineId: string;
+  kind: "simple" | "kit";
   productId: string;
   productName: string;
   imageUrl: string | null;
+  /** Lote do produto simples; para kit use o productId como âncora */
   batchId: string;
   quantity: number;
   unitPrice: number;
   maxQty: number;
   reservedQuantity?: number;
+  components?: KitComponentLine[];
 };
 
 export function cartStorageKey(subdomain: string) {
@@ -31,16 +38,23 @@ export function loadCartId(subdomain: string): string {
   return id;
 }
 
+function normalizeCartItem(item: CartItem): CartItem {
+  return {
+    ...item,
+    kind: item.kind ?? "simple",
+    lineId: item.lineId ?? item.batchId,
+    maxQty: item.maxQty ?? item.quantity,
+    components: item.components ?? undefined,
+  };
+}
+
 export function loadCartItems(subdomain: string): CartItem[] {
   if (typeof window === "undefined") return [];
   const raw = localStorage.getItem(cartStorageKey(subdomain));
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw) as CartItem[];
-    return parsed.map((item) => ({
-      ...item,
-      maxQty: item.maxQty ?? item.quantity,
-    }));
+    return parsed.map(normalizeCartItem);
   } catch {
     return [];
   }
@@ -58,6 +72,48 @@ export function cartCount(items: CartItem[]) {
   return items.reduce((s, i) => s + i.quantity, 0);
 }
 
+/** Achata a sacola em linhas de lote para reserva/checkout. */
+export function flattenCartLines(items: CartItem[]): Array<{
+  batchId: string;
+  quantity: number;
+  unitPrice?: number;
+  productName?: string;
+}> {
+  const lines: Array<{
+    batchId: string;
+    quantity: number;
+    unitPrice?: number;
+    productName?: string;
+  }> = [];
+  for (const item of items) {
+    if (item.kind === "kit" && item.components?.length) {
+      for (const c of item.components) {
+        lines.push({
+          batchId: c.batchId,
+          quantity: c.quantity,
+          unitPrice: c.unitPrice,
+          productName: c.productName,
+        });
+      }
+    } else {
+      lines.push({
+        batchId: item.batchId,
+        quantity: item.reservedQuantity ?? item.quantity,
+        unitPrice: item.unitPrice,
+        productName: item.productName,
+      });
+    }
+  }
+  return lines;
+}
+
+export function flattenCartForRelease(items: CartItem[]): CartLinePayload[] {
+  return flattenCartLines(items).map((l) => ({
+    batchId: l.batchId,
+    quantity: l.quantity,
+  }));
+}
+
 export async function clearCartRemote(
   domain: string,
   subdomain: string,
@@ -66,7 +122,7 @@ export async function clearCartRemote(
   const cartId = loadCartId(subdomain);
   if (cartId && items.length > 0) {
     try {
-      await releaseAllCartLines(domain, cartId, items as CartLinePayload[]);
+      await releaseAllCartLines(domain, cartId, flattenCartForRelease(items));
     } catch {
       // ignore
     }
@@ -78,22 +134,62 @@ export async function updateCartQuantity(
   domain: string,
   subdomain: string,
   items: CartItem[],
-  batchId: string,
+  lineId: string,
   nextQty: number
 ): Promise<CartItem[]> {
   const cartId = loadCartId(subdomain);
-  const item = items.find((i) => i.batchId === batchId);
+  const item = items.find((i) => i.lineId === lineId || i.batchId === lineId);
   if (!item || !cartId) return items;
+
+  if (item.kind === "kit") {
+    const previousComponents = item.components ?? [];
+    if (nextQty <= 0) {
+      await reserveKit(domain, {
+        cartId,
+        kitProductId: item.productId,
+        quantity: 0,
+        previousComponents,
+      });
+      const next = items.filter(
+        (i) => i.lineId !== item.lineId && i.batchId !== item.batchId
+      );
+      saveCartItems(subdomain, next);
+      return next;
+    }
+    if (nextQty > item.maxQty) {
+      throw new Error("Quantidade máxima disponível atingida.");
+    }
+    const result = await reserveKit(domain, {
+      cartId,
+      kitProductId: item.productId,
+      quantity: nextQty,
+      previousComponents,
+    });
+    const next = items.map((i) =>
+      i.lineId === item.lineId
+        ? {
+            ...i,
+            quantity: nextQty,
+            reservedQuantity: nextQty,
+            unitPrice: result.unitPrice,
+            maxQty: result.availableKits,
+            components: result.components,
+          }
+        : i
+    );
+    saveCartItems(subdomain, next);
+    return next;
+  }
 
   if (nextQty <= 0) {
     await adjustCartLine(
       domain,
       cartId,
-      batchId,
+      item.batchId,
       item.reservedQuantity ?? item.quantity,
       0
     );
-    const next = items.filter((i) => i.batchId !== batchId);
+    const next = items.filter((i) => i.lineId !== item.lineId);
     saveCartItems(subdomain, next);
     return next;
   }
@@ -105,12 +201,12 @@ export async function updateCartQuantity(
   await adjustCartLine(
     domain,
     cartId,
-    batchId,
+    item.batchId,
     item.reservedQuantity ?? item.quantity,
     nextQty
   );
   const next = items.map((i) =>
-    i.batchId === batchId
+    i.lineId === item.lineId
       ? { ...i, quantity: nextQty, reservedQuantity: nextQty }
       : i
   );

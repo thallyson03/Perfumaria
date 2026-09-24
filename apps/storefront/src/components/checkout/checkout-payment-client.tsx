@@ -12,6 +12,7 @@ import {
 import {
   cartSubtotal,
   clearCartRemote,
+  flattenCartLines,
   formatPrice,
   loadCartId,
   loadCartItems,
@@ -181,10 +182,7 @@ export function CheckoutPaymentClient({ subdomain }: { subdomain: string }) {
           customerPhone: customer.customerPhone,
           customerDocumentCpf: customer.customerCpf,
           fulfillment: buildFulfillmentPayload(fulfillment),
-          items: items.map((i) => ({
-            batchId: i.batchId,
-            quantity: i.quantity,
-          })),
+          items: flattenCartLines(items),
         }),
       });
       const data = await res.json();
@@ -226,10 +224,7 @@ export function CheckoutPaymentClient({ subdomain }: { subdomain: string }) {
           customerPhone: customer.customerPhone,
           customerEmail: customer.customerEmail,
           fulfillment: buildFulfillmentPayload(fulfillment),
-          items: items.map((i) => ({
-            batchId: i.batchId,
-            quantity: i.quantity,
-          })),
+          items: flattenCartLines(items),
         }),
       });
       const data = await res.json();

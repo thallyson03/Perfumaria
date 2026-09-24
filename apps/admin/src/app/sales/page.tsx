@@ -238,6 +238,12 @@ export default function SalesPage() {
   }, [payMethod]);
 
   function addProductToCart(product: Product) {
+    if ((product as Product & { kind?: string }).kind === "kit") {
+      setError(
+        "Kits virtuais ainda não estão no PDV — venda pela vitrine por enquanto."
+      );
+      return;
+    }
     const batch = pickFifoBatch(product.batches ?? []);
     if (!batch) {
       setError(`Sem estoque para ${product.name}`);

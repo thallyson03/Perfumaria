@@ -192,7 +192,7 @@ export function CheckoutCartClient({ subdomain }: { subdomain: string }) {
               {items.map((item) => {
                 const img = mediaUrl(item.imageUrl);
                 return (
-                  <article key={item.batchId} className="checkout-line">
+                  <article key={item.lineId} className="checkout-line">
                     <div className="checkout-line-thumb">
                       {img ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -216,8 +216,8 @@ export function CheckoutCartClient({ subdomain }: { subdomain: string }) {
                           <button
                             type="button"
                             className="cart-qty-btn"
-                            disabled={busy === item.batchId}
-                            onClick={() => void changeQty(item.batchId, -1)}
+                            disabled={busy === item.lineId}
+                            onClick={() => void changeQty(item.lineId, -1)}
                           >
                             −
                           </button>
@@ -226,10 +226,10 @@ export function CheckoutCartClient({ subdomain }: { subdomain: string }) {
                             type="button"
                             className="cart-qty-btn"
                             disabled={
-                              busy === item.batchId ||
+                              busy === item.lineId ||
                               item.quantity >= item.maxQty
                             }
-                            onClick={() => void changeQty(item.batchId, 1)}
+                            onClick={() => void changeQty(item.lineId, 1)}
                           >
                             +
                           </button>
@@ -237,8 +237,8 @@ export function CheckoutCartClient({ subdomain }: { subdomain: string }) {
                         <button
                           type="button"
                           className="checkout-link-btn"
-                          disabled={busy === item.batchId}
-                          onClick={() => void removeItem(item.batchId)}
+                          disabled={busy === item.lineId}
+                          onClick={() => void removeItem(item.lineId)}
                         >
                           Remover
                         </button>

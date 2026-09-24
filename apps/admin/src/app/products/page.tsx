@@ -25,6 +25,7 @@ type Product = {
   sku: string | null;
   barcode: string | null;
   imageUrl: string | null;
+  kind?: "simple" | "kit";
   price: string;
   cost: string;
   salePrice?: string | null;
@@ -34,10 +35,16 @@ type Product = {
   onSale?: boolean;
   availableStock: number;
   batches: Batch[];
+  kitItems?: Array<{
+    id?: string;
+    componentProductId: string;
+    componentName: string;
+    quantity: number;
+  }>;
 };
 
 type StatusFilter = "all" | "ok" | "expiring" | "low" | "out";
-type ModalMode = null | "product" | "batch" | "edit";
+type ModalMode = null | "product" | "batch" | "edit" | "kit";
 
 function toDateInputValue(iso: string | null | undefined) {
   if (!iso) return "";
@@ -67,8 +74,8 @@ function expiryStatus(days: number): "ok" | "warn" | "danger" {
   return "ok";
 }
 
-function nearestBatch(batches: Batch[]): Batch | null {
-  if (!batches.length) return null;
+function nearestBatch(batches: Batch[] | undefined): Batch | null {
+  if (!batches?.length) return null;
   return [...batches].sort(
     (a, b) =>
       new Date(a.expirationDate).getTime() -
@@ -112,6 +119,15 @@ export default function ProductsPage() {
   const [editSalePriceUntil, setEditSalePriceUntil] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
+  // kit
+  const [kitName, setKitName] = useState("");
+  const [kitPrice, setKitPrice] = useState("100");
+  const [kitCost, setKitCost] = useState("");
+  const [kitRows, setKitRows] = useState<
+    Array<{ componentProductId: string; quantity: string }>
+  >([{ componentProductId: "", quantity: "1" }]);
+  const [editingKitId, setEditingKitId] = useState<string | null>(null);
+
   async function load(t: string) {
     const data = (await apiFetch("/v1/products", t)) as Product[];
     setItems(data);
@@ -128,7 +144,7 @@ export default function ProductsPage() {
     let criticalProducts = 0;
     for (const p of items) {
       if (p.availableStock <= 2) criticalProducts += 1;
-      for (const b of p.batches) {
+      for (const b of p.batches ?? []) {
         const d = daysUntil(b.expirationDate);
         if (d < 90) alertLots += 1;
       }
@@ -148,7 +164,7 @@ export default function ProductsPage() {
           p.name.toLowerCase().includes(q) ||
           (p.sku ?? "").toLowerCase().includes(q) ||
           (p.barcode ?? "").includes(q) ||
-          p.batches.some((b) =>
+          p.batches?.some((b) =>
             (b.batchNumber ?? "").toLowerCase().includes(q)
           );
         if (!hit) return false;
@@ -172,6 +188,100 @@ export default function ProductsPage() {
   function flash(ok: string) {
     setMsg(ok);
     setTimeout(() => setMsg(null), 2500);
+  }
+
+  function openKitModal(product?: Product) {
+    setError(null);
+    if (product && product.kind === "kit") {
+      setEditingKitId(product.id);
+      setKitName(product.name);
+      setKitPrice(String(product.listPrice ?? Number(product.price)));
+      setKitCost(String(Number(product.cost) || ""));
+      setKitRows(
+        product.kitItems?.length
+          ? product.kitItems.map((i) => ({
+              componentProductId: i.componentProductId,
+              quantity: String(i.quantity),
+            }))
+          : [{ componentProductId: "", quantity: "1" }]
+      );
+      setImageUrl(product.imageUrl);
+    } else {
+      setEditingKitId(null);
+      setKitName("");
+      setKitPrice("100");
+      setKitCost("");
+      setKitRows([{ componentProductId: "", quantity: "1" }]);
+      setImageUrl(null);
+    }
+    setModal("kit");
+  }
+
+  async function saveKit(e: FormEvent) {
+    e.preventDefault();
+    if (!token) return;
+    setError(null);
+    const components = kitRows
+      .filter((r) => r.componentProductId)
+      .map((r) => ({
+        componentProductId: r.componentProductId,
+        quantity: Number(r.quantity),
+      }));
+    if (components.length < 1) {
+      setError("Inclua ao menos um componente no kit.");
+      return;
+    }
+    if (components.some((c) => !c.quantity || c.quantity < 1)) {
+      setError("Quantidade de cada componente deve ser ≥ 1.");
+      return;
+    }
+    const priceNum = Number(kitPrice);
+    const costNum = Number(kitCost);
+    if (!kitName.trim() || Number.isNaN(priceNum) || priceNum <= 0) {
+      setError("Informe nome e preço do kit.");
+      return;
+    }
+    if (Number.isNaN(costNum) || costNum <= 0) {
+      setError("Informe o custo do kit (maior que zero).");
+      return;
+    }
+    try {
+      if (editingKitId) {
+        await apiFetch(`/v1/products/${editingKitId}`, token, {
+          method: "PATCH",
+          body: JSON.stringify({
+            name: kitName.trim(),
+            price: priceNum,
+            cost: costNum,
+            imageUrl: imageUrl || undefined,
+          }),
+        });
+        await apiFetch(`/v1/products/${editingKitId}/kit-items`, token, {
+          method: "PUT",
+          body: JSON.stringify({ items: components }),
+        });
+        flash("Kit atualizado");
+      } else {
+        await apiFetch("/v1/products", token, {
+          method: "POST",
+          body: JSON.stringify({
+            name: kitName.trim(),
+            kind: "kit",
+            price: priceNum,
+            cost: costNum,
+            imageUrl: imageUrl || undefined,
+            kitItems: components,
+          }),
+        });
+        flash("Kit cadastrado");
+      }
+      setModal(null);
+      setEditingKitId(null);
+      setImageUrl(null);
+      await load(token);
+    } catch (err) {
+      setError((err as Error).message);
+    }
   }
 
   function openProductModal() {
@@ -204,6 +314,7 @@ export default function ProductsPage() {
   function closeModal() {
     setModal(null);
     setEditingId(null);
+    setEditingKitId(null);
   }
 
   async function onImageChange(file: File | null) {
@@ -407,6 +518,13 @@ export default function ProductsPage() {
             >
               + Cadastrar produto
             </button>
+            <button
+              type="button"
+              className="inv-btn"
+              onClick={() => openKitModal()}
+            >
+              + Montar kit
+            </button>
             <Link href="/sales" className="inv-btn inv-btn--primary">
               Novo pedido POS
             </Link>
@@ -484,17 +602,21 @@ export default function ProductsPage() {
               </thead>
               <tbody>
                 {filtered.map((p) => {
-                  const batch = nearestBatch(p.batches);
+                  const isKit = p.kind === "kit";
+                  const batches = p.batches ?? [];
+                  const batch = nearestBatch(batches);
                   const days = batch ? daysUntil(batch.expirationDate) : null;
                   const exp = days == null ? null : expiryStatus(days);
-                  const physical = p.batches.reduce(
-                    (s, b) => s + Math.max(0, b.quantity - b.reservedQuantity),
-                    0
-                  );
-                  const reserved = p.batches.reduce(
-                    (s, b) => s + b.reservedQuantity,
-                    0
-                  );
+                  const physical = isKit
+                    ? p.availableStock
+                    : batches.reduce(
+                        (s, b) =>
+                          s + Math.max(0, b.quantity - b.reservedQuantity),
+                        0
+                      );
+                  const reserved = isKit
+                    ? 0
+                    : batches.reduce((s, b) => s + b.reservedQuantity, 0);
                   const totalUnits = Math.max(physical + reserved, 1);
                   const sale = p.effectivePrice ?? Number(p.price);
                   const list = p.listPrice ?? Number(p.price);
@@ -518,7 +640,15 @@ export default function ProductsPage() {
                             )}
                           </div>
                           <div>
-                            <p className="inv-product-name">{p.name}</p>
+                            <p className="inv-product-name">
+                              {p.name}
+                              {isKit ? (
+                                <span className="inv-badge inv-badge--ok">
+                                  {" "}
+                                  Kit
+                                </span>
+                              ) : null}
+                            </p>
                             <p className="inv-product-meta">
                               SKU {p.sku ?? "—"}
                               {p.barcode ? ` · EAN ${p.barcode}` : ""}
@@ -528,7 +658,20 @@ export default function ProductsPage() {
                         </div>
                       </td>
                       <td>
-                        {batch ? (
+                        {isKit ? (
+                          <div className="inv-lot">
+                            <span className="inv-product-meta">
+                              Composição virtual
+                            </span>
+                            <ul className="inv-batches-list">
+                              {(p.kitItems ?? []).map((i) => (
+                                <li key={i.componentProductId}>
+                                  {i.quantity}× {i.componentName}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : batch ? (
                           <div className="inv-lot">
                             <span className="inv-lot-num">
                               {batch.batchNumber ?? "Sem nº"}
@@ -552,9 +695,9 @@ export default function ProductsPage() {
                             <span className="inv-product-meta">
                               Vence {batch.expirationDate.slice(0, 10)}
                             </span>
-                            {p.batches.length > 1 && (
+                            {batches.length > 1 && (
                               <ul className="inv-batches-list">
-                                {p.batches.slice(0, 3).map((b) => (
+                                {batches.slice(0, 3).map((b) => (
                                   <li key={b.id}>
                                     {b.batchNumber ?? "lote"} · {b.quantity} un ·{" "}
                                     {b.expirationDate.slice(0, 10)}
@@ -615,20 +758,32 @@ export default function ProductsPage() {
                       </td>
                       <td>
                         <div className="inv-row-actions">
-                          <button
-                            type="button"
-                            className="inv-link"
-                            onClick={() => openEdit(p)}
-                          >
-                            Editar
-                          </button>
-                          <button
-                            type="button"
-                            className="inv-link"
-                            onClick={() => openBatchModal(p.id)}
-                          >
-                            + Lote
-                          </button>
+                          {isKit ? (
+                            <button
+                              type="button"
+                              className="inv-link"
+                              onClick={() => openKitModal(p)}
+                            >
+                              Editar kit
+                            </button>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                className="inv-link"
+                                onClick={() => openEdit(p)}
+                              >
+                                Editar
+                              </button>
+                              <button
+                                type="button"
+                                className="inv-link"
+                                onClick={() => openBatchModal(p.id)}
+                              >
+                                + Lote
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -880,6 +1035,147 @@ export default function ProductsPage() {
                 disabled={savingEdit}
               >
                 {savingEdit ? "Salvando…" : "Salvar"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {modal === "kit" && (
+        <div className="inv-overlay" onClick={closeModal}>
+          <form
+            className="inv-modal"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={saveKit}
+          >
+            <h2>{editingKitId ? "Editar kit" : "Montar kit virtual"}</h2>
+            <p className="inv-product-meta">
+              O estoque do kit é calculado pelos componentes (FIFO nos lotes).
+            </p>
+            <label className="inv-field inv-field--full">
+              Nome do kit
+              <input
+                value={kitName}
+                onChange={(e) => setKitName(e.target.value)}
+                required
+              />
+            </label>
+            <label className="inv-field">
+              Preço de venda
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={kitPrice}
+                onChange={(e) => setKitPrice(e.target.value)}
+                required
+              />
+            </label>
+            <label className="inv-field">
+              Custo
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={kitCost}
+                onChange={(e) => setKitCost(e.target.value)}
+                required
+              />
+            </label>
+            <label className="inv-field inv-field--full">
+              Imagem (opcional)
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => onImageChange(e.target.files?.[0] ?? null)}
+              />
+              {uploading && <span>Enviando…</span>}
+              {imageUrl && <span>Imagem ok</span>}
+            </label>
+
+            <div className="inv-field inv-field--full">
+              <strong>Componentes</strong>
+              {kitRows.map((row, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 5rem auto",
+                    gap: "0.5rem",
+                    marginTop: "0.5rem",
+                  }}
+                >
+                  <select
+                    value={row.componentProductId}
+                    onChange={(e) =>
+                      setKitRows((prev) =>
+                        prev.map((r, i) =>
+                          i === idx
+                            ? { ...r, componentProductId: e.target.value }
+                            : r
+                        )
+                      )
+                    }
+                    required
+                  >
+                    <option value="">Produto…</option>
+                    {items
+                      .filter((p) => p.kind !== "kit")
+                      .map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                  </select>
+                  <input
+                    type="number"
+                    min="1"
+                    value={row.quantity}
+                    onChange={(e) =>
+                      setKitRows((prev) =>
+                        prev.map((r, i) =>
+                          i === idx ? { ...r, quantity: e.target.value } : r
+                        )
+                      )
+                    }
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="inv-link"
+                    onClick={() =>
+                      setKitRows((prev) =>
+                        prev.length <= 1
+                          ? prev
+                          : prev.filter((_, i) => i !== idx)
+                      )
+                    }
+                  >
+                    Remover
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="inv-link"
+                style={{ marginTop: "0.75rem" }}
+                onClick={() =>
+                  setKitRows((prev) => [
+                    ...prev,
+                    { componentProductId: "", quantity: "1" },
+                  ])
+                }
+              >
+                + Componente
+              </button>
+            </div>
+
+            <div className="inv-modal-actions">
+              <button type="button" className="inv-btn" onClick={closeModal}>
+                Cancelar
+              </button>
+              <button type="submit" className="inv-btn inv-btn--primary">
+                {editingKitId ? "Salvar kit" : "Criar kit"}
               </button>
             </div>
           </form>

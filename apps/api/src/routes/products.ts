@@ -9,6 +9,10 @@ import { randomUUID } from "node:crypto";
 import { prisma, withTenant } from "@revendedor/database";
 import { authenticateUser } from "../lib/auth-guards.js";
 import { mapProductPricing } from "../lib/product-price.js";
+import {
+  computeKitAvailability,
+  getKitAvailableStock,
+} from "../services/kit.js";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const UPLOAD_ROOT = path.resolve(
@@ -22,11 +26,17 @@ const ALLOWED_MIME = new Set([
   "image/gif",
 ]);
 
+const kitItemSchema = z.object({
+  componentProductId: z.string().uuid(),
+  quantity: z.number().int().positive().max(50),
+});
+
 const createProductSchema = z.object({
   name: z.string().min(1).max(255),
   sku: z.string().max(100).optional(),
   barcode: z.string().max(64).optional(),
   imageUrl: z.string().max(500).optional(),
+  kind: z.enum(["simple", "kit"]).optional().default("simple"),
   price: z.number().positive("Preço de venda deve ser maior que zero"),
   cost: z
     .number({
@@ -37,6 +47,7 @@ const createProductSchema = z.object({
   salePrice: z.number().positive().optional().nullable(),
   salePriceUntil: z.string().datetime().optional().nullable(),
   isActive: z.boolean().optional().default(true),
+  kitItems: z.array(kitItemSchema).max(30).optional(),
 });
 
 function validatePromotion(
@@ -98,11 +109,63 @@ export const productRoutes: FastifyPluginAsync = async (app) => {
               expirationDate: true,
             },
           },
+          kitItems: {
+            include: {
+              component: {
+                select: {
+                  id: true,
+                  name: true,
+                  batches: {
+                    select: { quantity: true, reservedQuantity: true },
+                  },
+                },
+              },
+            },
+          },
         },
       });
 
       return products
         .map((p) => {
+          const pricing = mapProductPricing(p);
+
+          if (p.kind === "kit") {
+            const availableStock = computeKitAvailability(
+              p.kitItems.map((item) => ({
+                quantity: item.quantity,
+                available: item.component.batches.reduce(
+                  (s, b) => s + (b.quantity - b.reservedQuantity),
+                  0
+                ),
+              }))
+            );
+            return {
+              id: p.id,
+              name: p.name,
+              sku: p.sku,
+              barcode: p.barcode,
+              imageUrl: p.imageUrl,
+              kind: p.kind,
+              price: pricing.effectivePrice,
+              listPrice: pricing.listPrice,
+              originalPrice: pricing.originalPrice,
+              onSale: pricing.onSale,
+              salePriceUntil: p.salePriceUntil,
+              availableStock,
+              batches: [] as Array<{
+                id: string;
+                available: number;
+                expirationDate: Date;
+              }>,
+              kitItems: p.kitItems.map((i) => ({
+                componentProductId: i.componentProductId,
+                componentName: i.component.name,
+                quantity: i.quantity,
+              })),
+              nearestExpiration: null as Date | null,
+            };
+          }
+
           const batches = p.batches
             .map((b) => ({
               id: b.id,
@@ -117,13 +180,13 @@ export const productRoutes: FastifyPluginAsync = async (app) => {
             );
 
           const availableStock = batches.reduce((sum, b) => sum + b.available, 0);
-          const pricing = mapProductPricing(p);
           return {
             id: p.id,
             name: p.name,
             sku: p.sku,
             barcode: p.barcode,
             imageUrl: p.imageUrl,
+            kind: p.kind,
             price: pricing.effectivePrice,
             listPrice: pricing.listPrice,
             originalPrice: pricing.originalPrice,
@@ -131,6 +194,7 @@ export const productRoutes: FastifyPluginAsync = async (app) => {
             salePriceUntil: p.salePriceUntil,
             availableStock,
             batches,
+            kitItems: [],
             nearestExpiration: batches[0]?.expirationDate ?? null,
           };
         })
@@ -146,15 +210,51 @@ export const productRoutes: FastifyPluginAsync = async (app) => {
       return withTenant(prisma, tenantId, async (tx) => {
         const products = await tx.product.findMany({
           orderBy: { createdAt: "desc" },
-          include: { batches: true },
+          include: {
+            batches: true,
+            kitItems: {
+              include: {
+                component: {
+                  select: {
+                    id: true,
+                    name: true,
+                    batches: {
+                      select: { quantity: true, reservedQuantity: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
         });
-        return products.map((p) => ({
-          ...mapProductPricing(p),
-          availableStock: p.batches.reduce(
-            (s, b) => s + (b.quantity - b.reservedQuantity),
-            0
-          ),
-        }));
+        return products.map((p) => {
+          const pricing = mapProductPricing(p);
+          const availableStock =
+            p.kind === "kit"
+              ? computeKitAvailability(
+                  p.kitItems.map((item) => ({
+                    quantity: item.quantity,
+                    available: item.component.batches.reduce(
+                      (s, b) => s + (b.quantity - b.reservedQuantity),
+                      0
+                    ),
+                  }))
+                )
+              : p.batches.reduce(
+                  (s, b) => s + (b.quantity - b.reservedQuantity),
+                  0
+                );
+          return {
+            ...pricing,
+            availableStock,
+            kitItems: p.kitItems.map((i) => ({
+              id: i.id,
+              componentProductId: i.componentProductId,
+              componentName: i.component.name,
+              quantity: i.quantity,
+            })),
+          };
+        });
       });
     });
 
@@ -227,15 +327,50 @@ export const productRoutes: FastifyPluginAsync = async (app) => {
         return reply.status(400).send({ error: parsed.error.flatten() });
       }
       const tenantId = req.tenantId!;
+      const kind = parsed.data.kind ?? "simple";
+      const kitItems = parsed.data.kitItems ?? [];
+
+      if (kind === "kit") {
+        if (kitItems.length < 1) {
+          return reply
+            .status(400)
+            .send({ error: "Informe ao menos 1 componente no kit" });
+        }
+        const ids = kitItems.map((i) => i.componentProductId);
+        if (new Set(ids).size !== ids.length) {
+          return reply
+            .status(400)
+            .send({ error: "Componente duplicado no kit" });
+        }
+      }
+
       try {
-        const product = await withTenant(prisma, tenantId, (tx) =>
-          tx.product.create({
+        const product = await withTenant(prisma, tenantId, async (tx) => {
+          if (kind === "kit") {
+            const components = await tx.product.findMany({
+              where: { id: { in: kitItems.map((i) => i.componentProductId) } },
+            });
+            if (components.length !== kitItems.length) {
+              throw Object.assign(new Error("Componente inválido"), {
+                statusCode: 400,
+              });
+            }
+            if (components.some((c) => c.kind === "kit")) {
+              throw Object.assign(
+                new Error("Não é permitido kit dentro de kit"),
+                { statusCode: 400 }
+              );
+            }
+          }
+
+          const created = await tx.product.create({
             data: {
               tenantId,
               name: parsed.data.name,
               sku: parsed.data.sku || null,
               barcode: parsed.data.barcode || null,
               imageUrl: parsed.data.imageUrl || null,
+              kind,
               price: parsed.data.price,
               cost: parsed.data.cost,
               salePrice: parsed.data.salePrice ?? null,
@@ -243,14 +378,126 @@ export const productRoutes: FastifyPluginAsync = async (app) => {
                 ? new Date(parsed.data.salePriceUntil)
                 : null,
               isActive: parsed.data.isActive,
+              ...(kind === "kit"
+                ? {
+                    kitItems: {
+                      create: kitItems.map((item) => ({
+                        tenantId,
+                        componentProductId: item.componentProductId,
+                        quantity: item.quantity,
+                      })),
+                    },
+                  }
+                : {}),
             },
-          })
-        );
-        return reply.status(201).send(mapProductPricing(product));
-      } catch {
-        return reply.status(409).send({
-          error: "SKU ou código de barras já cadastrado nesta loja",
+            include: {
+              kitItems: {
+                include: { component: { select: { id: true, name: true } } },
+              },
+            },
+          });
+          return created;
         });
+        return reply.status(201).send({
+          ...mapProductPricing(product),
+          kitItems: product.kitItems?.map((i) => ({
+            id: i.id,
+            componentProductId: i.componentProductId,
+            componentName: i.component.name,
+            quantity: i.quantity,
+          })),
+        });
+      } catch (err) {
+        const status =
+          err && typeof err === "object" && "statusCode" in err
+            ? Number((err as { statusCode: number }).statusCode)
+            : 409;
+        const message =
+          err instanceof Error ? err.message : "SKU ou código já cadastrado";
+        return reply.status(status === 400 ? 400 : 409).send({ error: message });
+      }
+    });
+
+    privateApp.put("/:productId/kit-items", async (req, reply) => {
+      const { productId } = req.params as { productId: string };
+      const schema = z.object({
+        items: z.array(kitItemSchema).min(1).max(30),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return reply.status(400).send({ error: parsed.error.flatten() });
+      }
+      const tenantId = req.tenantId!;
+      const ids = parsed.data.items.map((i) => i.componentProductId);
+      if (new Set(ids).size !== ids.length) {
+        return reply.status(400).send({ error: "Componente duplicado" });
+      }
+      if (ids.includes(productId)) {
+        return reply
+          .status(400)
+          .send({ error: "Kit não pode conter a si mesmo" });
+      }
+
+      try {
+        const result = await withTenant(prisma, tenantId, async (tx) => {
+          const kit = await tx.product.findFirst({ where: { id: productId } });
+          if (!kit) return null;
+          if (kit.kind !== "kit") {
+            throw Object.assign(new Error("Produto não é um kit"), {
+              statusCode: 400,
+            });
+          }
+          const components = await tx.product.findMany({
+            where: { id: { in: ids } },
+          });
+          if (components.length !== ids.length) {
+            throw Object.assign(new Error("Componente inválido"), {
+              statusCode: 400,
+            });
+          }
+          if (components.some((c) => c.kind === "kit")) {
+            throw Object.assign(new Error("Não é permitido kit dentro de kit"), {
+              statusCode: 400,
+            });
+          }
+
+          await tx.kitItem.deleteMany({ where: { kitProductId: productId } });
+          await tx.kitItem.createMany({
+            data: parsed.data.items.map((item) => ({
+              tenantId,
+              kitProductId: productId,
+              componentProductId: item.componentProductId,
+              quantity: item.quantity,
+            })),
+          });
+
+          const availableStock = await getKitAvailableStock(tx, productId);
+          const items = await tx.kitItem.findMany({
+            where: { kitProductId: productId },
+            include: { component: { select: { id: true, name: true } } },
+          });
+          return {
+            availableStock,
+            kitItems: items.map((i) => ({
+              id: i.id,
+              componentProductId: i.componentProductId,
+              componentName: i.component.name,
+              quantity: i.quantity,
+            })),
+          };
+        });
+        if (!result) {
+          return reply.status(404).send({ error: "Kit não encontrado" });
+        }
+        return result;
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Falha ao salvar composição";
+        const status =
+          err && typeof err === "object" && "statusCode" in err
+            ? Number((err as { statusCode: number }).statusCode)
+            : 400;
+        return reply.status(status).send({ error: message });
       }
     });
 
@@ -364,22 +611,40 @@ export const productRoutes: FastifyPluginAsync = async (app) => {
       }
       const tenantId = req.tenantId!;
 
-      const batch = await withTenant(prisma, tenantId, async (tx) => {
-        const product = await tx.product.findFirst({ where: { id: productId } });
-        if (!product) return null;
-        return tx.productBatch.create({
-          data: {
-            tenantId,
-            productId,
-            batchNumber: parsed.data.batchNumber,
-            expirationDate: new Date(parsed.data.expirationDate),
-            quantity: parsed.data.quantity,
-          },
+      try {
+        const batch = await withTenant(prisma, tenantId, async (tx) => {
+          const product = await tx.product.findFirst({ where: { id: productId } });
+          if (!product) return null;
+          if (product.kind === "kit") {
+            throw Object.assign(
+              new Error(
+                "Kits não possuem lote próprio — estoque vem dos componentes"
+              ),
+              { statusCode: 400 }
+            );
+          }
+          return tx.productBatch.create({
+            data: {
+              tenantId,
+              productId,
+              batchNumber: parsed.data.batchNumber,
+              expirationDate: new Date(parsed.data.expirationDate),
+              quantity: parsed.data.quantity,
+            },
+          });
         });
-      });
 
-      if (!batch) return reply.status(404).send({ error: "Produto não encontrado" });
-      return reply.status(201).send(batch);
+        if (!batch) return reply.status(404).send({ error: "Produto não encontrado" });
+        return reply.status(201).send(batch);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Falha ao criar lote";
+        const status =
+          err && typeof err === "object" && "statusCode" in err
+            ? Number((err as { statusCode: number }).statusCode)
+            : 500;
+        return reply.status(status).send({ error: message });
+      }
     });
   });
 };

@@ -705,9 +705,21 @@
   color: #fff;
 }
 
+.product-badge--kit {
+  background: var(--brand-oui-bg);
+  color: var(--brand-oui);
+}
+
 .product-badge--stock {
   background: var(--brand-boticario-bg);
   color: var(--brand-boticario);
+}
+
+.product-card-kit-items {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.35;
 }
 
 .product-card-body {

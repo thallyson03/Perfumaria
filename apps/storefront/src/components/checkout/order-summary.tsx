@@ -32,7 +32,7 @@ export function CheckoutOrderSummary({
         {items.map((item) => {
           const img = mediaUrl(item.imageUrl);
           return (
-            <li key={item.batchId} className="checkout-summary-item">
+            <li key={item.lineId} className="checkout-summary-item">
               <div className="checkout-summary-thumb">
                 {img ? (
                   // eslint-disable-next-line @next/next/no-img-element

@@ -21,8 +21,13 @@ import { fetchPublicOrder } from "@/lib/orders";
 import {
   adjustCartLine,
   releaseAllCartLines,
-  syncCartReservations,
+  reserveKit,
 } from "@/lib/cart-api";
+import {
+  flattenCartForRelease,
+  flattenCartLines,
+  type CartItem,
+} from "@/lib/cart-storage";
 import { storeHref, tenantDomain } from "@/lib/store-url";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -44,18 +49,13 @@ type Product = {
   onSale?: boolean;
   imageUrl: string | null;
   availableStock: number;
+  kind?: "simple" | "kit";
   batches: Batch[];
-};
-
-type CartItem = {
-  productId: string;
-  productName: string;
-  imageUrl: string | null;
-  batchId: string;
-  quantity: number;
-  unitPrice: number;
-  maxQty: number;
-  reservedQuantity?: number;
+  kitItems?: Array<{
+    componentProductId: string;
+    componentName: string;
+    quantity: number;
+  }>;
 };
 
 type CheckoutStep = "cart" | "fulfillment" | "whatsapp" | "pix" | "pix_waiting";
@@ -219,6 +219,8 @@ export function StoreClient({ subdomain }: { subdomain: string }) {
       setItems(
         parsed.map((item) => ({
           ...item,
+          kind: item.kind ?? "simple",
+          lineId: item.lineId ?? item.batchId,
           maxQty: item.maxQty ?? item.quantity,
         }))
       );
@@ -289,21 +291,45 @@ export function StoreClient({ subdomain }: { subdomain: string }) {
     cartSyncedRef.current = true;
 
     void (async () => {
-      const synced = await syncCartReservations(domain, cartId, items);
-      if (synced.length < items.length) {
+      const next: CartItem[] = [];
+      let dropped = false;
+      for (const item of items) {
+        try {
+          if (item.kind === "kit") {
+            const result = await reserveKit(domain, {
+              cartId,
+              kitProductId: item.productId,
+              quantity: item.quantity,
+              previousComponents: item.components?.map((c) => ({
+                batchId: c.batchId,
+                quantity: c.quantity,
+              })),
+            });
+            next.push({
+              ...item,
+              unitPrice: result.unitPrice,
+              maxQty: result.availableKits || item.maxQty,
+              reservedQuantity: item.quantity,
+              components: result.components,
+            });
+          } else {
+            await adjustCartLine(
+              domain,
+              cartId,
+              item.batchId,
+              item.reservedQuantity ?? 0,
+              item.quantity
+            );
+            next.push({ ...item, reservedQuantity: item.quantity });
+          }
+        } catch {
+          dropped = true;
+        }
+      }
+      if (dropped) {
         setMessage("Alguns itens foram removidos por falta de estoque.");
       }
-      setItems((prev) =>
-        prev
-          .filter((item) => synced.some((s) => s.batchId === item.batchId))
-          .map((item) => {
-            const match = synced.find((s) => s.batchId === item.batchId);
-            return {
-              ...item,
-              reservedQuantity: match?.reservedQuantity ?? item.quantity,
-            };
-          })
-      );
+      setItems(next);
     })();
   }, [cartId, domain, items.length]);
 
@@ -321,14 +347,82 @@ export function StoreClient({ subdomain }: { subdomain: string }) {
   }, [cartOpen]);
 
   async function addToCart(product: Product) {
+    if (!cartId) return;
+
+    if (product.kind === "kit") {
+      const existing = items.find(
+        (i) => i.kind === "kit" && i.productId === product.id
+      );
+      const nextQty = (existing?.quantity ?? 0) + 1;
+      const maxQty = existing?.maxQty ?? product.availableStock;
+      if (nextQty > maxQty) {
+        setMessage("Quantidade máxima disponível atingida.");
+        return;
+      }
+      setLoading(true);
+      setMessage(null);
+      try {
+        const result = await reserveKit(domain, {
+          cartId,
+          kitProductId: product.id,
+          quantity: nextQty,
+          previousComponents: existing?.components?.map((c) => ({
+            batchId: c.batchId,
+            quantity: c.quantity,
+          })),
+        });
+        setItems((prev) => {
+          if (existing) {
+            return prev.map((i) =>
+              i.lineId === existing.lineId
+                ? {
+                    ...i,
+                    quantity: nextQty,
+                    reservedQuantity: nextQty,
+                    unitPrice: result.unitPrice,
+                    maxQty: result.availableKits || maxQty,
+                    components: result.components,
+                  }
+                : i
+            );
+          }
+          const lineId = `kit:${product.id}`;
+          return [
+            ...prev,
+            {
+              lineId,
+              kind: "kit" as const,
+              productId: product.id,
+              productName: product.name,
+              imageUrl: product.imageUrl,
+              batchId: lineId,
+              quantity: 1,
+              unitPrice: result.unitPrice,
+              maxQty: result.availableKits || product.availableStock,
+              reservedQuantity: 1,
+              components: result.components,
+            },
+          ];
+        });
+        setCartOpen(true);
+        setMessage(`${product.name} adicionado à sacola`);
+      } catch (err) {
+        setMessage(err instanceof Error ? err.message : "Sem estoque");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     const batch = pickFifoBatch(product.batches);
     if (!batch) {
       setMessage("Produto sem estoque no momento.");
       return;
     }
-    if (!cartId) return;
 
-    const existing = items.find((i) => i.batchId === batch.id);
+    const existing = items.find(
+      (i) => i.kind !== "kit" && i.batchId === batch.id
+    );
     const nextQty = (existing?.quantity ?? 0) + 1;
     const maxQty = existing?.maxQty ?? batch.available;
 
@@ -359,6 +453,8 @@ export function StoreClient({ subdomain }: { subdomain: string }) {
         return [
           ...prev,
           {
+            lineId: batch.id,
+            kind: "simple" as const,
             productId: product.id,
             productName: product.name,
             imageUrl: product.imageUrl,
@@ -379,13 +475,13 @@ export function StoreClient({ subdomain }: { subdomain: string }) {
     }
   }
 
-  async function changeCartQuantity(batchId: string, delta: number) {
-    const item = items.find((i) => i.batchId === batchId);
+  async function changeCartQuantity(lineId: string, delta: number) {
+    const item = items.find((i) => i.lineId === lineId || i.batchId === lineId);
     if (!item || !cartId) return;
 
     const nextQty = item.quantity + delta;
     if (nextQty <= 0) {
-      await removeCartItem(batchId);
+      await removeCartItem(item.lineId);
       return;
     }
     if (nextQty > item.maxQty) {
@@ -393,23 +489,49 @@ export function StoreClient({ subdomain }: { subdomain: string }) {
       return;
     }
 
-    setCartLineBusy(batchId);
+    setCartLineBusy(item.lineId);
     setMessage(null);
     try {
-      await adjustCartLine(
-        domain,
-        cartId,
-        batchId,
-        item.reservedQuantity ?? item.quantity,
-        nextQty
-      );
-      setItems((prev) =>
-        prev.map((i) =>
-          i.batchId === batchId
-            ? { ...i, quantity: nextQty, reservedQuantity: nextQty }
-            : i
-        )
-      );
+      if (item.kind === "kit") {
+        const result = await reserveKit(domain, {
+          cartId,
+          kitProductId: item.productId,
+          quantity: nextQty,
+          previousComponents: item.components?.map((c) => ({
+            batchId: c.batchId,
+            quantity: c.quantity,
+          })),
+        });
+        setItems((prev) =>
+          prev.map((i) =>
+            i.lineId === item.lineId
+              ? {
+                  ...i,
+                  quantity: nextQty,
+                  reservedQuantity: nextQty,
+                  unitPrice: result.unitPrice,
+                  maxQty: result.availableKits || i.maxQty,
+                  components: result.components,
+                }
+              : i
+          )
+        );
+      } else {
+        await adjustCartLine(
+          domain,
+          cartId,
+          item.batchId,
+          item.reservedQuantity ?? item.quantity,
+          nextQty
+        );
+        setItems((prev) =>
+          prev.map((i) =>
+            i.lineId === item.lineId
+              ? { ...i, quantity: nextQty, reservedQuantity: nextQty }
+              : i
+          )
+        );
+      }
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Erro ao atualizar sacola");
     } finally {
@@ -417,21 +539,33 @@ export function StoreClient({ subdomain }: { subdomain: string }) {
     }
   }
 
-  async function removeCartItem(batchId: string) {
-    const item = items.find((i) => i.batchId === batchId);
+  async function removeCartItem(lineId: string) {
+    const item = items.find((i) => i.lineId === lineId || i.batchId === lineId);
     if (!item || !cartId) return;
 
-    setCartLineBusy(batchId);
+    setCartLineBusy(item.lineId);
     setMessage(null);
     try {
-      await adjustCartLine(
-        domain,
-        cartId,
-        batchId,
-        item.reservedQuantity ?? item.quantity,
-        0
-      );
-      setItems((prev) => prev.filter((i) => i.batchId !== batchId));
+      if (item.kind === "kit") {
+        await reserveKit(domain, {
+          cartId,
+          kitProductId: item.productId,
+          quantity: 0,
+          previousComponents: item.components?.map((c) => ({
+            batchId: c.batchId,
+            quantity: c.quantity,
+          })),
+        });
+      } else {
+        await adjustCartLine(
+          domain,
+          cartId,
+          item.batchId,
+          item.reservedQuantity ?? item.quantity,
+          0
+        );
+      }
+      setItems((prev) => prev.filter((i) => i.lineId !== item.lineId));
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Erro ao remover item");
     } finally {
@@ -442,7 +576,7 @@ export function StoreClient({ subdomain }: { subdomain: string }) {
   async function clearCart() {
     if (cartId && items.length > 0) {
       try {
-        await releaseAllCartLines(domain, cartId, items);
+        await releaseAllCartLines(domain, cartId, flattenCartForRelease(items));
       } catch {
         // Libera o que conseguir; estado local sempre zera
       }
@@ -558,10 +692,7 @@ export function StoreClient({ subdomain }: { subdomain: string }) {
           customerPhone,
           customerDocumentCpf: customerCpf.replace(/\D/g, ""),
           fulfillment: buildFulfillmentPayload(fulfillment),
-          items: items.map((i) => ({
-            batchId: i.batchId,
-            quantity: i.quantity,
-          })),
+          items: flattenCartLines(items),
         }),
       });
       const data = await res.json();
@@ -598,10 +729,7 @@ export function StoreClient({ subdomain }: { subdomain: string }) {
           customerPhone,
           customerEmail,
           fulfillment: buildFulfillmentPayload(fulfillment),
-          items: items.map((i) => ({
-            batchId: i.batchId,
-            quantity: i.quantity,
-          })),
+          items: flattenCartLines(items),
         }),
       });
       const data = await res.json();
@@ -1186,12 +1314,12 @@ export function StoreClient({ subdomain }: { subdomain: string }) {
             <>
               {items.map((item) => (
                 <CartLineItem
-                  key={item.batchId}
+                  key={item.lineId}
                   item={item}
-                  busy={cartLineBusy === item.batchId}
-                  onIncrease={() => void changeCartQuantity(item.batchId, 1)}
-                  onDecrease={() => void changeCartQuantity(item.batchId, -1)}
-                  onRemove={() => void removeCartItem(item.batchId)}
+                  busy={cartLineBusy === item.lineId}
+                  onIncrease={() => void changeCartQuantity(item.lineId, 1)}
+                  onDecrease={() => void changeCartQuantity(item.lineId, -1)}
+                  onRemove={() => void removeCartItem(item.lineId)}
                 />
               ))}
             </>
@@ -1414,6 +1542,9 @@ function ProductCard({
           </span>
         )}
         <div className="product-card-badges">
+          {product.kind === "kit" && (
+            <span className="product-badge product-badge--kit">Kit</span>
+          )}
           {product.onSale && (
             <span className="product-badge product-badge--sale">Promoção</span>
           )}
@@ -1426,10 +1557,18 @@ function ProductCard({
       </div>
       <div className="product-card-body">
         <div className="product-card-meta">
-          {product.availableStock} unidade
-          {product.availableStock !== 1 ? "s" : ""} · curadoria
+          {product.kind === "kit"
+            ? `${product.availableStock} kit${product.availableStock !== 1 ? "s" : ""} montáveis`
+            : `${product.availableStock} unidade${product.availableStock !== 1 ? "s" : ""} · curadoria`}
         </div>
         <h3 className="product-card-name">{product.name}</h3>
+        {product.kind === "kit" && product.kitItems && product.kitItems.length > 0 && (
+          <p className="product-card-kit-items">
+            {product.kitItems
+              .map((i) => `${i.quantity}× ${i.componentName}`)
+              .join(" · ")}
+          </p>
+        )}
         <div className="product-card-price-row">
           <div className="product-card-price">
             {product.onSale && product.originalPrice != null && (

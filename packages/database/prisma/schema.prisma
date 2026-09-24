@@ -12,6 +12,11 @@ enum UserRole {
   staff
 }
 
+enum ProductKind {
+  simple
+  kit
+}
+
 model Tenant {
   id        String   @id @default(uuid()) @db.Uuid
   name      String   @db.VarChar(255)
@@ -44,6 +49,7 @@ model Tenant {
   invoiceItems         InvoiceItem[]
   salesOrders          SalesOrder[]
   salesOrderItems      SalesOrderItem[]
+  kitItems             KitItem[]
 
   @@map("tenants")
 }
@@ -119,6 +125,7 @@ model Product {
   sku       String?  @db.VarChar(100)
   barcode   String?  @db.VarChar(64)
   imageUrl  String?  @map("image_url") @db.VarChar(500)
+  kind      ProductKind @default(simple)
   price     Decimal   @db.Decimal(10, 2)
   cost      Decimal   @default(0) @db.Decimal(10, 2)
   salePrice Decimal?  @map("sale_price") @db.Decimal(10, 2)
@@ -129,11 +136,32 @@ model Product {
   tenant Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   batches ProductBatch[]
   invoiceItems InvoiceItem[]
+  kitItems     KitItem[] @relation("KitAsProduct")
+  asComponent  KitItem[] @relation("ComponentInKits")
 
   @@unique([tenantId, sku])
   @@unique([tenantId, barcode])
   @@index([tenantId])
+  @@index([tenantId, kind])
   @@map("products")
+}
+
+model KitItem {
+  id                 String @id @default(uuid()) @db.Uuid
+  tenantId           String @map("tenant_id") @db.Uuid
+  kitProductId       String @map("kit_product_id") @db.Uuid
+  componentProductId String @map("component_product_id") @db.Uuid
+  quantity           Int
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  kit       Product @relation("KitAsProduct", fields: [kitProductId], references: [id], onDelete: Cascade)
+  component Product @relation("ComponentInKits", fields: [componentProductId], references: [id], onDelete: Restrict)
+
+  @@unique([kitProductId, componentProductId])
+  @@index([tenantId])
+  @@index([tenantId, kitProductId])
+  @@map("kit_items")
 }
 
 model ProductBatch {

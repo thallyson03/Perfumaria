@@ -6,6 +6,15 @@ export type CartLinePayload = {
   reservedQuantity?: number;
 };
 
+export type KitComponentLine = {
+  batchId: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+};
+
 function cartHeaders(domain: string) {
   return {
     "Content-Type": "application/json",
@@ -58,6 +67,39 @@ export async function adjustCartLine(
   });
   const data = await res.json();
   if (!res.ok) throw new Error(await parseError(res, data));
+}
+
+export async function reserveKit(
+  domain: string,
+  payload: {
+    cartId: string;
+    kitProductId: string;
+    quantity: number;
+    previousComponents?: Array<{ batchId: string; quantity: number }>;
+  }
+): Promise<{
+  cartId: string;
+  quantity: number;
+  unitPrice: number;
+  availableKits: number;
+  components: KitComponentLine[];
+  kitName?: string;
+}> {
+  const res = await fetch(`${API}/v1/cart/reserve-kit`, {
+    method: "POST",
+    headers: cartHeaders(domain),
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(await parseError(res, data));
+  return {
+    cartId: (data.cartId as string) ?? payload.cartId,
+    quantity: Number(data.quantity ?? 0),
+    unitPrice: Number(data.unitPrice ?? 0),
+    availableKits: Number(data.availableKits ?? 0),
+    components: (data.components ?? []) as KitComponentLine[],
+    kitName: data.kitName as string | undefined,
+  };
 }
 
 export async function releaseAllCartLines(

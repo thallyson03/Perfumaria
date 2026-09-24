@@ -55,10 +55,12 @@ const orderItemsSchema = z
     z.object({
       batchId: z.string().uuid(),
       quantity: z.number().int().positive().max(50),
+      unitPrice: z.number().min(0).optional(),
+      productName: z.string().min(1).max(255).optional(),
     })
   )
   .min(1)
-  .max(30);
+  .max(60);
 
 const whatsappOrderSchema = z
   .object({
@@ -157,11 +159,19 @@ function mapStoreConfig(tenant: {
 
 async function estimateCartTotal(
   tenantId: string,
-  items: Array<{ batchId: string; quantity: number }>
+  items: Array<{
+    batchId: string;
+    quantity: number;
+    unitPrice?: number;
+  }>
 ) {
   return withTenant(prisma, tenantId, async (tx) => {
     let total = 0;
     for (const item of items) {
+      if (item.unitPrice != null && Number.isFinite(item.unitPrice)) {
+        total += item.unitPrice * item.quantity;
+        continue;
+      }
       const batch = await tx.productBatch.findFirst({
         where: { id: item.batchId },
         include: { product: true },
