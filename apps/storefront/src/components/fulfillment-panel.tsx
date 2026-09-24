@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AddressForm } from "@/components/address-form";
 import { loadCustomerSession } from "@/lib/customer-session";
 import {
@@ -297,7 +298,13 @@ export function FulfillmentLocationMenu({
   onQuoteChange,
 }: Props) {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const saved = loadGuestDelivery(subdomain);
@@ -309,7 +316,11 @@ export function FulfillmentLocationMenu({
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     function onPointerDown(e: MouseEvent) {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (ref.current?.contains(target) || panelRef.current?.contains(target)) {
+        return;
+      }
+      setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
@@ -346,41 +357,44 @@ export function FulfillmentLocationMenu({
           </span>
           <ChevronIcon />
         </button>
-        {open && (
-          <div className="store-location-panel">
-            <FulfillmentPanel
-              subdomain={subdomain}
-              domain={domain}
-              config={config}
-              cartTotal={cartTotal}
-              itemCount={itemCount}
-              value={value}
-              onQuoteChange={onQuoteChange}
-              onChange={(next) => {
-                onChange(next);
-                saveGuestDelivery(subdomain, next);
-              }}
-              compact
-            />
-            <button
-              type="button"
-              className="btn-primary"
-              disabled={!isFulfillmentValid(value, config)}
-              onClick={() => setOpen(false)}
-            >
-              Confirmar
-            </button>
-          </div>
-        )}
       </div>
 
-      {open && (
-        <div
-          className="store-location-overlay"
-          onClick={() => setOpen(false)}
-          aria-hidden
-        />
-      )}
+      {mounted &&
+        open &&
+        createPortal(
+          <>
+            <div
+              className="store-location-overlay"
+              onClick={() => setOpen(false)}
+              aria-hidden
+            />
+            <div className="store-location-panel" ref={panelRef}>
+              <FulfillmentPanel
+                subdomain={subdomain}
+                domain={domain}
+                config={config}
+                cartTotal={cartTotal}
+                itemCount={itemCount}
+                value={value}
+                onQuoteChange={onQuoteChange}
+                onChange={(next) => {
+                  onChange(next);
+                  saveGuestDelivery(subdomain, next);
+                }}
+                compact
+              />
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={!isFulfillmentValid(value, config)}
+                onClick={() => setOpen(false)}
+              >
+                Confirmar
+              </button>
+            </div>
+          </>,
+          document.body
+        )}
     </>
   );
 }

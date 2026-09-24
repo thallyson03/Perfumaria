@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   clearCustomerSession,
   fetchCustomerProfile,
@@ -36,6 +37,11 @@ export function CustomerAuthMenu({ subdomain, domain, onSessionChange }: Props) 
   const [password, setPassword] = useState("");
 
   const menuRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -221,136 +227,142 @@ export function CustomerAuthMenu({ subdomain, domain, onSessionChange }: Props) 
         )}
       </div>
 
-      {modalOpen && (
-        <div
-          className="auth-overlay"
-          onClick={() => !loading && setModalOpen(false)}
-        >
+      {mounted &&
+        modalOpen &&
+        createPortal(
           <div
-            className="auth-modal"
-            role="dialog"
-            aria-labelledby="auth-modal-title"
-            onClick={(e) => e.stopPropagation()}
+            className="auth-overlay"
+            onClick={() => !loading && setModalOpen(false)}
           >
-            <div className="auth-modal-header">
-              <h2 id="auth-modal-title">
-                {mode === "login" ? "Entrar na loja" : "Criar conta"}
-              </h2>
-              <button
-                type="button"
-                className="auth-modal-close"
-                onClick={() => setModalOpen(false)}
-                aria-label="Fechar"
-              >
-                ×
-              </button>
+            <div
+              className="auth-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="auth-modal-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="auth-modal-header">
+                <h2 id="auth-modal-title">
+                  {mode === "login" ? "Entrar na loja" : "Criar conta"}
+                </h2>
+                <button
+                  type="button"
+                  className="auth-modal-close"
+                  onClick={() => setModalOpen(false)}
+                  aria-label="Fechar"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="auth-tabs">
+                <button
+                  type="button"
+                  className={mode === "login" ? "active" : ""}
+                  onClick={() => {
+                    setMode("login");
+                    setError(null);
+                  }}
+                >
+                  Entrar
+                </button>
+                <button
+                  type="button"
+                  className={mode === "register" ? "active" : ""}
+                  onClick={() => {
+                    setMode("register");
+                    setError(null);
+                  }}
+                >
+                  Criar conta
+                </button>
+              </div>
+
+              <form className="auth-form" onSubmit={handleSubmit}>
+                {mode === "register" && (
+                  <>
+                    <label>
+                      Nome completo
+                      <input
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        required
+                        autoComplete="name"
+                      />
+                    </label>
+                    <label>
+                      Telefone (opcional)
+                      <input
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        autoComplete="tel"
+                      />
+                    </label>
+                    <label>
+                      CPF
+                      <input
+                        value={documentCpf}
+                        onChange={(e) =>
+                          setDocumentCpf(
+                            e.target.value.replace(/\D/g, "").slice(0, 11)
+                          )
+                        }
+                        required
+                        inputMode="numeric"
+                        autoComplete="off"
+                        placeholder="Somente números"
+                        minLength={11}
+                        maxLength={11}
+                      />
+                    </label>
+                  </>
+                )}
+
+                <label>
+                  E-mail
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoComplete="email"
+                  />
+                </label>
+
+                <label>
+                  Senha
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={mode === "register" ? 8 : 1}
+                    autoComplete={
+                      mode === "register" ? "new-password" : "current-password"
+                    }
+                  />
+                </label>
+
+                {mode === "register" && (
+                  <p className="auth-hint">
+                    A senha deve ter no mínimo 8 caracteres.
+                  </p>
+                )}
+
+                {error && <p className="auth-error">{error}</p>}
+
+                <button type="submit" className="btn-primary" disabled={loading}>
+                  {loading
+                    ? "Aguarde…"
+                    : mode === "login"
+                      ? "Entrar"
+                      : "Criar conta"}
+                </button>
+              </form>
             </div>
-
-            <div className="auth-tabs">
-              <button
-                type="button"
-                className={mode === "login" ? "active" : ""}
-                onClick={() => {
-                  setMode("login");
-                  setError(null);
-                }}
-              >
-                Entrar
-              </button>
-              <button
-                type="button"
-                className={mode === "register" ? "active" : ""}
-                onClick={() => {
-                  setMode("register");
-                  setError(null);
-                }}
-              >
-                Criar conta
-              </button>
-            </div>
-
-            <form className="auth-form" onSubmit={handleSubmit}>
-              {mode === "register" && (
-                <>
-                  <label>
-                    Nome completo
-                    <input
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      required
-                      autoComplete="name"
-                    />
-                  </label>
-                  <label>
-                    Telefone (opcional)
-                    <input
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      autoComplete="tel"
-                    />
-                  </label>
-                  <label>
-                    CPF
-                    <input
-                      value={documentCpf}
-                      onChange={(e) =>
-                        setDocumentCpf(
-                          e.target.value.replace(/\D/g, "").slice(0, 11)
-                        )
-                      }
-                      required
-                      inputMode="numeric"
-                      autoComplete="off"
-                      placeholder="Somente números"
-                      minLength={11}
-                      maxLength={11}
-                    />
-                  </label>
-                </>
-              )}
-
-              <label>
-                E-mail
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                />
-              </label>
-
-              <label>
-                Senha
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={mode === "register" ? 8 : 1}
-                  autoComplete={
-                    mode === "register" ? "new-password" : "current-password"
-                  }
-                />
-              </label>
-
-              {mode === "register" && (
-                <p className="auth-hint">A senha deve ter no mínimo 8 caracteres.</p>
-              )}
-
-              {error && <p className="auth-error">{error}</p>}
-
-              <button type="submit" className="btn-primary" disabled={loading}>
-                {loading
-                  ? "Aguarde…"
-                  : mode === "login"
-                    ? "Entrar"
-                    : "Criar conta"}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </>
   );
 }
