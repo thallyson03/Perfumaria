@@ -77,6 +77,23 @@ export function CustomerAuthMenu({ subdomain, domain, onSessionChange }: Props) 
   }, [subdomain, domain]);
 
   useEffect(() => {
+    if (!menuOpen && !modalOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setModalOpen(false);
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen, modalOpen]);
+
+  useEffect(() => {
     if (!menuOpen) return;
     function onPointerDown(e: MouseEvent) {
       if (!menuRef.current?.contains(e.target as Node)) {
