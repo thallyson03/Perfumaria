@@ -307,11 +307,14 @@
 
 .store-location-panel {
   position: fixed;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  left: 1rem;
+  right: 1rem;
+  top: 1rem;
+  bottom: 1rem;
   width: min(24rem, calc(100vw - 2rem));
-  max-height: min(85dvh, 36rem);
+  height: fit-content;
+  max-height: calc(100dvh - 2rem);
+  margin: auto;
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -1358,14 +1361,9 @@
   position: fixed;
   inset: 0;
   z-index: 90;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: max(1.25rem, env(safe-area-inset-top, 0px))
-    max(1rem, env(safe-area-inset-right, 0px))
-    max(1.25rem, env(safe-area-inset-bottom, 0px))
-    max(1rem, env(safe-area-inset-left, 0px));
-  overflow-x: hidden;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
@@ -1375,23 +1373,26 @@
 
 .auth-modal {
   width: min(100%, 400px);
-  margin: auto;
-  display: flex;
-  flex-direction: column;
-  max-height: min(36rem, calc(100dvh - 2.5rem));
+  max-height: calc(100dvh - 2.5rem);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   background: var(--surface-card);
   border-radius: var(--radius-xl);
   box-shadow: 0 20px 48px rgba(28, 27, 26, 0.16);
-  overflow: hidden;
 }
 
 .auth-modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.75rem;
   padding: 1rem 1.15rem;
   border-bottom: 1px solid var(--line);
-  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  background: var(--surface-card);
+  z-index: 1;
 }
 
 .auth-modal-header h2 {
@@ -1409,18 +1410,24 @@
   cursor: pointer;
   color: var(--muted);
   padding: 0.25rem;
+  flex-shrink: 0;
 }
 
 .auth-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  flex-shrink: 0;
+  position: sticky;
+  top: 3.35rem;
+  background: var(--surface-card);
+  z-index: 1;
+  border-bottom: 1px solid var(--line);
 }
 
 .auth-tabs button {
   background: none;
   border: 0;
   border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
   padding: 0.75rem;
   cursor: pointer;
   font-weight: 600;
@@ -1437,11 +1444,6 @@
   display: grid;
   gap: 0.75rem;
   padding: 1.15rem;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  flex: 1;
-  min-height: 0;
 }
 
 .auth-form label {
@@ -1459,6 +1461,7 @@
   width: 100%;
   font-size: 1rem;
   background: #fff;
+  box-sizing: border-box;
 }
 
 .auth-form input:focus {
@@ -1712,9 +1715,10 @@
     right: 0;
     top: auto;
     bottom: 0;
-    transform: none;
     width: 100%;
+    height: auto;
     max-height: min(90dvh, 100%);
+    margin: 0;
     border-radius: 1rem 1rem 0 0;
     padding: 1.15rem 1.15rem calc(1.15rem + env(safe-area-inset-bottom, 0px));
     box-shadow: 0 -8px 32px rgba(28, 27, 26, 0.12);
@@ -1899,19 +1903,21 @@
   }
 
   .auth-overlay {
-    align-items: flex-end;
+    place-items: end center;
     padding: 0;
+    align-items: end;
   }
 
   .auth-modal {
     width: 100%;
+    max-width: 100%;
     max-height: min(92dvh, 100%);
-    margin: 0;
     border-radius: 1rem 1rem 0 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .auth-form {
-    padding-bottom: calc(1.15rem + env(safe-area-inset-bottom, 0px));
+    padding-bottom: 1.25rem;
   }
 
   .store-toast {
