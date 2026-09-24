@@ -13,6 +13,8 @@ export type SaleItemInput = {
   quantity: number;
   /** Carrinho vitrine: reserva Redis já incrementou reserved_quantity */
   skipReserve?: boolean;
+  unitPrice?: number;
+  productName?: string;
 };
 
 export type CreateSaleOptions = {
@@ -146,11 +148,15 @@ export async function createSale(
       });
     }
 
-    const unitPrice = getEffectivePrice(batch.product);    const lineTotal = unitPrice * item.quantity;
+    const unitPrice =
+      item.unitPrice != null && Number.isFinite(item.unitPrice)
+        ? Number(item.unitPrice)
+        : getEffectivePrice(batch.product);
+    const lineTotal = Number((unitPrice * item.quantity).toFixed(2));
     total += lineTotal;
     lineItems.push({
       productId: batch.productId,
-      productName: batch.product.name,
+      productName: item.productName?.trim() || batch.product.name,
       quantity: item.quantity,
       unitPrice,
       lineTotal,

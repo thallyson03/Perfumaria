@@ -10,6 +10,7 @@ import { prisma, withTenant } from "@revendedor/database";
 import { authenticateUser } from "../lib/auth-guards.js";
 import { mapProductPricing } from "../lib/product-price.js";
 import {
+  allocateKitComponents,
   computeKitAvailability,
   getKitAvailableStock,
 } from "../services/kit.js";
@@ -588,6 +589,32 @@ export const productRoutes: FastifyPluginAsync = async (app) => {
           return reply.status(400).send({ error: e.details ?? e.message });
         }
         throw err;
+      }
+    });
+
+    privateApp.post("/:productId/allocate-kit", async (req, reply) => {
+      const { productId } = req.params as { productId: string };
+      const schema = z.object({
+        quantity: z.number().int().positive().max(50),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return reply.status(400).send({ error: parsed.error.flatten() });
+      }
+      const tenantId = req.tenantId!;
+      try {
+        const result = await withTenant(prisma, tenantId, (tx) =>
+          allocateKitComponents(tx, productId, parsed.data.quantity)
+        );
+        return result;
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Falha ao montar kit";
+        const status =
+          err && typeof err === "object" && "statusCode" in err
+            ? Number((err as { statusCode: number }).statusCode)
+            : 400;
+        return reply.status(status).send({ error: message });
       }
     });
 

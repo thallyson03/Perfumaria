@@ -33,6 +33,7 @@ type Product = {
   sku: string | null;
   barcode: string | null;
   imageUrl: string | null;
+  kind?: "simple" | "kit";
   price: string;
   effectivePrice?: number;
   listPrice?: number;
@@ -40,9 +41,25 @@ type Product = {
   isActive?: boolean;
   availableStock: number;
   batches: Batch[];
+  kitItems?: Array<{
+    componentProductId: string;
+    componentName: string;
+    quantity: number;
+  }>;
+};
+
+type KitComponentLine = {
+  batchId: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
 };
 
 type CartLine = {
+  lineId: string;
+  kind: "simple" | "kit";
   batchId: string;
   productId: string;
   productName: string;
@@ -52,6 +69,7 @@ type CartLine = {
   onSale: boolean;
   quantity: number;
   maxQty: number;
+  components?: KitComponentLine[];
 };
 
 type QueueOrder = {
@@ -237,11 +255,71 @@ export default function SalesPage() {
     }
   }, [payMethod]);
 
+  async function addKitToCart(product: Product, nextKitQty: number) {
+    if (!token) return;
+    if (nextKitQty <= 0) {
+      setCart((prev) => prev.filter((l) => l.productId !== product.id || l.kind !== "kit"));
+      return;
+    }
+    try {
+      const allocation = (await apiFetch(
+        `/v1/products/${product.id}/allocate-kit`,
+        token,
+        {
+          method: "POST",
+          body: JSON.stringify({ quantity: nextKitQty }),
+        }
+      )) as {
+        unitPrice: number;
+        availableKits: number;
+        kitName: string;
+        components: KitComponentLine[];
+      };
+      setError(null);
+      setCart((prev) => {
+        const idx = prev.findIndex(
+          (l) => l.kind === "kit" && l.productId === product.id
+        );
+        const line: CartLine = {
+          lineId: `kit:${product.id}`,
+          kind: "kit",
+          batchId: `kit:${product.id}`,
+          productId: product.id,
+          productName: allocation.kitName || product.name,
+          sku: product.sku,
+          unitPrice: allocation.unitPrice,
+          listPrice: product.listPrice ?? Number(product.price),
+          onSale: Boolean(product.onSale),
+          quantity: nextKitQty,
+          maxQty: allocation.availableKits,
+          components: allocation.components,
+        };
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = line;
+          return next;
+        }
+        return [...prev, line];
+      });
+      setScanFlash(true);
+      setTimeout(() => setScanFlash(false), 450);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
   function addProductToCart(product: Product) {
-    if ((product as Product & { kind?: string }).kind === "kit") {
-      setError(
-        "Kits virtuais ainda não estão no PDV — venda pela vitrine por enquanto."
+    if (product.kind === "kit") {
+      const existing = cart.find(
+        (l) => l.kind === "kit" && l.productId === product.id
       );
+      const nextQty = (existing?.quantity ?? 0) + 1;
+      const maxQty = existing?.maxQty ?? product.availableStock;
+      if (nextQty > maxQty) {
+        setError("Quantidade máxima de kits atingida");
+        return;
+      }
+      void addKitToCart(product, nextQty);
       return;
     }
     const batch = pickFifoBatch(product.batches ?? []);
@@ -258,7 +336,9 @@ export default function SalesPage() {
     const unitPrice = product.effectivePrice ?? Number(product.price);
     const listPrice = product.listPrice ?? Number(product.price);
     setCart((prev) => {
-      const idx = prev.findIndex((l) => l.batchId === batch.id);
+      const idx = prev.findIndex(
+        (l) => l.kind !== "kit" && l.batchId === batch.id
+      );
       if (idx >= 0) {
         const next = [...prev];
         const line = next[idx];
@@ -271,6 +351,8 @@ export default function SalesPage() {
       return [
         ...prev,
         {
+          lineId: batch.id,
+          kind: "simple" as const,
           batchId: batch.id,
           productId: product.id,
           productName: product.name,
@@ -326,14 +408,26 @@ export default function SalesPage() {
     }
   }
 
-  function updateQty(batchId: string, delta: number) {
+  function updateQty(lineId: string, delta: number) {
+    const line = cart.find((l) => l.lineId === lineId || l.batchId === lineId);
+    if (!line) return;
+    const nextQty = Math.max(0, Math.min(line.maxQty, line.quantity + delta));
+    if (line.kind === "kit") {
+      const product = products.find((p) => p.id === line.productId);
+      if (!product) {
+        setError("Kit não encontrado no catálogo — atualize o estoque");
+        return;
+      }
+      void addKitToCart(product, nextQty);
+      return;
+    }
     setCart((prev) =>
       prev
         .map((l) =>
-          l.batchId === batchId
+          l.lineId === line.lineId
             ? {
                 ...l,
-                quantity: Math.max(0, Math.min(l.maxQty, l.quantity + delta)),
+                quantity: nextQty,
               }
             : l
         )
@@ -341,8 +435,10 @@ export default function SalesPage() {
     );
   }
 
-  function removeLine(batchId: string) {
-    setCart((prev) => prev.filter((l) => l.batchId !== batchId));
+  function removeLine(lineId: string) {
+    setCart((prev) =>
+      prev.filter((l) => l.lineId !== lineId && l.batchId !== lineId)
+    );
   }
 
   function clearSale() {
@@ -382,10 +478,24 @@ export default function SalesPage() {
         method: "POST",
         body: JSON.stringify({
           customerId,
-          items: cart.map((l) => ({
-            batchId: l.batchId,
-            quantity: l.quantity,
-          })),
+          items: cart.flatMap((l) => {
+            if (l.kind === "kit" && l.components?.length) {
+              return l.components.map((c) => ({
+                batchId: c.batchId,
+                quantity: c.quantity,
+                unitPrice: c.unitPrice,
+                productName: c.productName,
+              }));
+            }
+            return [
+              {
+                batchId: l.batchId,
+                quantity: l.quantity,
+                unitPrice: l.unitPrice,
+                productName: l.productName,
+              },
+            ];
+          }),
           installments: Number(installments) || 1,
           payNow,
           useWalletAmount: wallet,
@@ -529,6 +639,7 @@ export default function SalesPage() {
                         product.effectivePrice ?? Number(product.price);
                       const list = product.listPrice ?? Number(product.price);
                       const img = mediaUrl(product.imageUrl);
+                      const isKit = product.kind === "kit";
                       const out = (product.availableStock ?? 0) <= 0;
                       return (
                         <button
@@ -548,16 +659,24 @@ export default function SalesPage() {
                             {product.onSale && (
                               <span className="pdv-sale-badge">Promo</span>
                             )}
+                            {isKit && (
+                              <span className="pdv-sale-badge" style={{ left: "auto", right: "0.4rem", top: "0.4rem", background: "#2d5a4a" }}>
+                                Kit
+                              </span>
+                            )}
                             <span className="pdv-stock-badge">
-                              {product.availableStock} un
+                              {product.availableStock}{" "}
+                              {isKit ? "kits" : "un"}
                             </span>
                           </div>
                           <div className="pdv-product-sku">
-                            {product.sku
-                              ? `SKU: ${product.sku}`
-                              : product.barcode
-                                ? `EAN: ${product.barcode}`
-                                : "Sem SKU"}
+                            {isKit
+                              ? "Kit virtual"
+                              : product.sku
+                                ? `SKU: ${product.sku}`
+                                : product.barcode
+                                  ? `EAN: ${product.barcode}`
+                                  : "Sem SKU"}
                           </div>
                           <h3 className="pdv-product-name">{product.name}</h3>
                           <div className="pdv-product-foot">
@@ -678,21 +797,36 @@ export default function SalesPage() {
               </div>
             ) : (
               cart.map((line) => (
-                <div key={line.batchId} className="pdv-line">
+                <div key={line.lineId} className="pdv-line">
                   <div>
-                    <h3>{line.productName}</h3>
+                    <h3>
+                      {line.productName}
+                      {line.kind === "kit" ? " · Kit" : ""}
+                    </h3>
                     <div className="pdv-line-meta">
-                      {line.sku ? `SKU ${line.sku} · ` : ""}
-                      Unit. {formatBrl(line.unitPrice)}
+                      {line.kind === "kit"
+                        ? `${formatBrl(line.unitPrice)} / kit`
+                        : `${line.sku ? `SKU ${line.sku} · ` : ""}Unit. ${formatBrl(line.unitPrice)}`}
                       {line.onSale && line.listPrice > line.unitPrice
                         ? " · promo"
                         : ""}
                     </div>
+                    {line.kind === "kit" && line.components && (
+                      <div
+                        className="pdv-line-meta"
+                        style={{ marginTop: "0.25rem" }}
+                      >
+                        {line.components
+                          .map((c) => c.productName.replace(/^.*·\s*/, ""))
+                          .filter((v, i, a) => a.indexOf(v) === i)
+                          .join(" + ")}
+                      </div>
+                    )}
                     <div className="pdv-line-controls">
                       <div className="pdv-qty">
                         <button
                           type="button"
-                          onClick={() => updateQty(line.batchId, -1)}
+                          onClick={() => updateQty(line.lineId, -1)}
                         >
                           −
                         </button>
@@ -700,7 +834,7 @@ export default function SalesPage() {
                         <button
                           type="button"
                           disabled={line.quantity >= line.maxQty}
-                          onClick={() => updateQty(line.batchId, 1)}
+                          onClick={() => updateQty(line.lineId, 1)}
                         >
                           +
                         </button>
@@ -708,7 +842,7 @@ export default function SalesPage() {
                       <button
                         type="button"
                         className="pdv-line-remove"
-                        onClick={() => removeLine(line.batchId)}
+                        onClick={() => removeLine(line.lineId)}
                       >
                         Remover
                       </button>

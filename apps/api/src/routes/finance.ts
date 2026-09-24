@@ -31,10 +31,12 @@ const createSaleSchema = z.object({
       z.object({
         batchId: z.string().uuid(),
         quantity: z.number().int().positive().max(500),
+        unitPrice: z.number().min(0).optional(),
+        productName: z.string().min(1).max(255).optional(),
       })
     )
     .min(1)
-    .max(50),
+    .max(80),
   installments: z.number().int().min(1).max(12).default(1),
   payNow: z.boolean().optional().default(false),
   useWalletAmount: z.number().min(0).optional().default(0),
