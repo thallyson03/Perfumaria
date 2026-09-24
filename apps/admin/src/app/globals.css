@@ -1,0 +1,32 @@
+:root {
+  --bg: #0f1c18;
+  --bg-elevated: #162822;
+  --ink: #e8f2ec;
+  --muted: #9bb5a8;
+  --accent: #3d9b6a;
+  --accent-soft: #2a6b4a;
+  --danger: #d4655a;
+  --line: rgba(232, 242, 236, 0.12);
+  --font-sans: "DM Sans", sans-serif;
+  --font-display: "Instrument Serif", Georgia, serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background:
+    radial-gradient(1200px 600px at 10% -10%, #1f3d30 0%, transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, #24352e 0%, transparent 50%),
+    var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+a {
+  color: inherit;
+}

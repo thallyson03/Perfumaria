@@ -1,0 +1,69 @@
+:root {
+  --bg: #fdf8f6;
+  --surface: #fdf8f6;
+  --surface-bright: #fdf8f6;
+  --surface-low: #f7f3f0;
+  --surface-container: #f2edeb;
+  --surface-high: #ece7e5;
+  --surface-highest: #e6e2df;
+  --surface-card: #ffffff;
+  --ink: #1c1b1a;
+  --ink-variant: #564243;
+  --muted: #897173;
+  --outline: #897173;
+  --outline-soft: #dcc0c1;
+  --line: rgba(28, 27, 26, 0.08);
+  --primary: #5b021c;
+  --primary-deep: #7a1c30;
+  --primary-hover: #4a0117;
+  --on-primary: #ffffff;
+  --secondary: #7f5602;
+  --secondary-gold: #c59341;
+  --secondary-fixed: #fdc56e;
+  --on-secondary: #ffffff;
+  --rose: #d8a499;
+  --danger: #ba1a1a;
+  --font-serif: "Noto Serif", Georgia, "Times New Roman", serif;
+  --font-sans: "Plus Jakarta Sans", system-ui, sans-serif;
+  --radius: 0.25rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --shadow-1: 0 1px 3px rgba(28, 27, 26, 0.03), 0 6px 16px rgba(122, 28, 48, 0.02);
+  --shadow-2: 0 8px 24px rgba(28, 27, 26, 0.08), 0 2px 6px rgba(197, 147, 65, 0.04);
+  --brand-boticario-bg: #ebf5f0;
+  --brand-boticario: #1b6b48;
+  --brand-eudora-bg: #f6edf4;
+  --brand-eudora: #641d58;
+  --brand-oui-bg: #f9f5ec;
+  --brand-oui: #8b6a2b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+::selection {
+  background: var(--primary);
+  color: var(--on-primary);
+}

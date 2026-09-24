@@ -1,0 +1,349 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  staff
+}
+
+model Tenant {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @db.VarChar(255)
+  subdomain String   @unique @db.VarChar(100)
+  active    Boolean  @default(true)
+  whatsappPhone          String?  @map("whatsapp_phone") @db.VarChar(20)
+  channelWhatsapp        Boolean  @default(true) @map("channel_whatsapp")
+  channelOnlinePayment   Boolean  @default(false) @map("channel_online_payment")
+  mercadoPagoAccessToken String?  @map("mercado_pago_access_token") @db.VarChar(512)
+  deliveryEnabled        Boolean  @default(true) @map("delivery_enabled")
+  pickupEnabled          Boolean  @default(true) @map("pickup_enabled")
+  freeDeliveryMinAmount  Decimal? @map("free_delivery_min_amount") @db.Decimal(10, 2)
+  deliveryMessage        String?  @map("delivery_message") @db.VarChar(500)
+  pickupAddress          String?  @map("pickup_address") @db.VarChar(500)
+  shippingProvider       String?  @map("shipping_provider") @db.VarChar(32)
+  shippingOriginZipCode  String?  @map("shipping_origin_zip_code") @db.VarChar(9)
+  melhorEnvioToken       String?  @map("melhor_envio_token") @db.VarChar(512)
+  correiosContractCode   String?  @map("correios_contract_code") @db.VarChar(64)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  users                User[]
+  customers            Customer[]
+  customerAddresses    CustomerAddress[]
+  products             Product[]
+  productBatches       ProductBatch[]
+  invoices             Invoice[]
+  accountsReceivable   AccountReceivable[]
+  walletLedger         WalletLedger[]
+  customerDebtSummaries CustomerDebtSummary[]
+  invoiceItems         InvoiceItem[]
+  salesOrders          SalesOrder[]
+  salesOrderItems      SalesOrderItem[]
+
+  @@map("tenants")
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  email        String   @db.VarChar(255)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  role         UserRole @default(admin)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("users")
+}
+
+model Customer {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  fullName     String   @map("full_name") @db.VarChar(255)
+  phone        String?  @db.VarChar(20)
+  documentCpf  String?  @map("document_cpf") @db.VarChar(14)
+  email        String?  @db.VarChar(255)
+  passwordHash String?  @map("password_hash") @db.VarChar(255)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant             Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoices           Invoice[]
+  accountsReceivable AccountReceivable[]
+  walletLedger       WalletLedger[]
+  debtSummary        CustomerDebtSummary?
+  salesOrders        SalesOrder[]
+  addresses          CustomerAddress[]
+
+  @@unique([tenantId, email])
+  @@unique([tenantId, documentCpf])
+  @@index([tenantId])
+  @@map("customers")
+}
+
+model CustomerAddress {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  customerId     String   @map("customer_id") @db.Uuid
+  label          String   @default("Casa") @db.VarChar(50)
+  recipientName  String   @map("recipient_name") @db.VarChar(255)
+  phone          String   @db.VarChar(20)
+  zipCode        String   @map("zip_code") @db.VarChar(9)
+  street         String   @db.VarChar(255)
+  number         String   @db.VarChar(20)
+  complement     String?  @db.VarChar(100)
+  neighborhood   String   @db.VarChar(100)
+  city           String   @db.VarChar(100)
+  state          String   @db.VarChar(2)
+  isDefault      Boolean  @default(false) @map("is_default")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  orders   SalesOrder[]
+
+  @@index([tenantId, customerId])
+  @@map("customer_addresses")
+}
+
+model Product {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  name      String   @db.VarChar(255)
+  sku       String?  @db.VarChar(100)
+  barcode   String?  @db.VarChar(64)
+  imageUrl  String?  @map("image_url") @db.VarChar(500)
+  price     Decimal   @db.Decimal(10, 2)
+  cost      Decimal   @default(0) @db.Decimal(10, 2)
+  salePrice Decimal?  @map("sale_price") @db.Decimal(10, 2)
+  salePriceUntil DateTime? @map("sale_price_until") @db.Timestamptz(6)
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  batches ProductBatch[]
+  invoiceItems InvoiceItem[]
+
+  @@unique([tenantId, sku])
+  @@unique([tenantId, barcode])
+  @@index([tenantId])
+  @@map("products")
+}
+
+model ProductBatch {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  productId        String   @map("product_id") @db.Uuid
+  batchNumber      String?  @map("batch_number") @db.VarChar(100)
+  expirationDate   DateTime @map("expiration_date") @db.Date
+  quantity         Int      @default(0)
+  reservedQuantity Int      @default(0) @map("reserved_quantity")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, productId])
+  @@index([tenantId, expirationDate])
+  @@map("product_batches")
+}
+
+enum InvoiceStatus {
+  pending
+  partial
+  paid
+  canceled
+}
+
+enum ReceivableStatus {
+  pending
+  paid
+  overdue
+}
+
+enum LedgerOperation {
+  CREDIT
+  DEBIT
+}
+
+model Invoice {
+  id          String        @id @default(uuid()) @db.Uuid
+  tenantId    String        @map("tenant_id") @db.Uuid
+  customerId  String        @map("customer_id") @db.Uuid
+  totalAmount Decimal       @map("total_amount") @db.Decimal(10, 2)
+  status      InvoiceStatus @default(pending)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer           Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  accountsReceivable AccountReceivable[]
+  items              InvoiceItem[]
+
+  @@index([tenantId])
+  @@index([tenantId, customerId])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String  @id @default(uuid()) @db.Uuid
+  tenantId    String  @map("tenant_id") @db.Uuid
+  invoiceId   String  @map("invoice_id") @db.Uuid
+  productId   String? @map("product_id") @db.Uuid
+  productName String  @map("product_name") @db.VarChar(255)
+  quantity    Int
+  unitPrice   Decimal @map("unit_price") @db.Decimal(10, 2)
+  lineTotal   Decimal @map("line_total") @db.Decimal(10, 2)
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoice Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([tenantId, invoiceId])
+  @@map("invoice_items")
+}
+
+model AccountReceivable {
+  id                String           @id @default(uuid()) @db.Uuid
+  tenantId          String           @map("tenant_id") @db.Uuid
+  customerId        String           @map("customer_id") @db.Uuid
+  invoiceId         String?          @map("invoice_id") @db.Uuid
+  installmentNumber Int              @map("installment_number")
+  amount            Decimal          @db.Decimal(10, 2)
+  dueDate           DateTime         @map("due_date") @db.Date
+  status            ReceivableStatus @default(pending)
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  invoice  Invoice? @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, status, dueDate])
+  @@map("accounts_receivable")
+}
+
+model WalletLedger {
+  id            String          @id @default(uuid()) @db.Uuid
+  tenantId      String          @map("tenant_id") @db.Uuid
+  customerId    String          @map("customer_id") @db.Uuid
+  operationType LedgerOperation @map("operation_type")
+  amount        Decimal         @db.Decimal(10, 2)
+  description   String?         @db.VarChar(255)
+  referenceId   String?         @map("reference_id") @db.Uuid
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, customerId])
+  @@map("wallet_ledger")
+}
+
+/// Pré-agregado pelo worker (Top devedores / dashboard)
+model CustomerDebtSummary {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  customerId     String   @unique @map("customer_id") @db.Uuid
+  totalDebt      Decimal  @map("total_debt") @db.Decimal(12, 2)
+  overdueDebt    Decimal  @default(0) @map("overdue_debt") @db.Decimal(12, 2)
+  pendingCount   Int      @default(0) @map("pending_count")
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, totalDebt(sort: Desc)])
+  @@map("customer_debt_summaries")
+}
+
+enum OrderChannel {
+  whatsapp
+  online_payment
+}
+
+enum FulfillmentType {
+  delivery
+  pickup
+}
+
+enum OrderStatus {
+  awaiting_seller
+  pending_payment
+  confirmed
+  cancelled
+  expired
+}
+
+model SalesOrder {
+  id                 String       @id @default(uuid()) @db.Uuid
+  tenantId           String       @map("tenant_id") @db.Uuid
+  publicCode         String       @map("public_code") @db.VarChar(12)
+  channel            OrderChannel
+  status             OrderStatus  @default(awaiting_seller)
+  customerName       String?      @map("customer_name") @db.VarChar(255)
+  customerPhone      String?      @map("customer_phone") @db.VarChar(20)
+  customerDocumentCpf String?     @map("customer_document_cpf") @db.VarChar(14)
+  customerEmail      String?      @map("customer_email") @db.VarChar(255)
+  customerId         String?      @map("customer_id") @db.Uuid
+  fulfillmentType    FulfillmentType @default(delivery) @map("fulfillment_type")
+  deliveryAddressId  String?      @map("delivery_address_id") @db.Uuid
+  deliveryRecipientName String?   @map("delivery_recipient_name") @db.VarChar(255)
+  deliveryPhone      String?      @map("delivery_phone") @db.VarChar(20)
+  deliveryZipCode    String?      @map("delivery_zip_code") @db.VarChar(9)
+  deliveryStreet     String?      @map("delivery_street") @db.VarChar(255)
+  deliveryNumber     String?      @map("delivery_number") @db.VarChar(20)
+  deliveryComplement String?      @map("delivery_complement") @db.VarChar(100)
+  deliveryNeighborhood String?    @map("delivery_neighborhood") @db.VarChar(100)
+  deliveryCity       String?      @map("delivery_city") @db.VarChar(100)
+  deliveryState      String?      @map("delivery_state") @db.VarChar(2)
+  shippingQuoteAmount Decimal?    @map("shipping_quote_amount") @db.Decimal(10, 2)
+  shippingQuoteDays  Int?         @map("shipping_quote_days")
+  shippingProvider   String?      @map("shipping_provider") @db.VarChar(32)
+  cartId             String?      @map("cart_id") @db.VarChar(80)
+  totalAmount        Decimal      @map("total_amount") @db.Decimal(10, 2)
+  invoiceId          String?      @map("invoice_id") @db.Uuid
+  paymentProvider    String?      @map("payment_provider") @db.VarChar(32)
+  paymentExternalId  String?      @map("payment_external_id") @db.VarChar(64)
+  paymentPixCode     String?      @map("payment_pix_code") @db.VarChar(512)
+  paymentQrBase64    String?      @map("payment_qr_base64") @db.Text
+  expiresAt          DateTime?    @map("expires_at") @db.Timestamptz(6)
+  confirmedAt        DateTime?    @map("confirmed_at") @db.Timestamptz(6)
+  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  deliveryAddress CustomerAddress? @relation(fields: [deliveryAddressId], references: [id], onDelete: SetNull)
+  items    SalesOrderItem[]
+
+  @@unique([tenantId, publicCode])
+  @@index([tenantId, status, createdAt(sort: Desc)])
+  @@index([paymentExternalId])
+  @@map("sales_orders")
+}
+
+model SalesOrderItem {
+  id          String  @id @default(uuid()) @db.Uuid
+  tenantId    String  @map("tenant_id") @db.Uuid
+  orderId     String  @map("order_id") @db.Uuid
+  batchId     String  @map("batch_id") @db.Uuid
+  productId   String? @map("product_id") @db.Uuid
+  productName String  @map("product_name") @db.VarChar(255)
+  quantity    Int
+  unitPrice   Decimal @map("unit_price") @db.Decimal(10, 2)
+  lineTotal   Decimal @map("line_total") @db.Decimal(10, 2)
+
+  tenant Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order  SalesOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, orderId])
+  @@map("sales_order_items")
+}

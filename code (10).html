@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Login Seguro | Atelier Prestige ERP &amp; Commerce</title>
+<!-- Google Fonts: Noto Serif & Plus Jakarta Sans -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;family=Plus+Jakarta+Sans:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config Verbatim -->
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "error-container": "#ffdad6",
+            "on-secondary-container": "#775000",
+            "tertiary-fixed": "#ffdad3",
+            "secondary-container": "#fdc56e",
+            "surface-container-high": "#ece7e5",
+            "surface-container": "#f2edeb",
+            "inverse-primary": "#ffb2ba",
+            "on-primary-fixed": "#400010",
+            "secondary-fixed": "#ffddaf",
+            "surface-container-highest": "#e6e2df",
+            "on-tertiary-container": "#d4a196",
+            "surface-variant": "#e6e2df",
+            "on-secondary": "#ffffff",
+            "tertiary-container": "#5c372f",
+            "background": "#fdf8f6",
+            "surface-tint": "#a23a4c",
+            "on-background": "#1c1b1a",
+            "on-error": "#ffffff",
+            "on-tertiary-fixed": "#30130d",
+            "primary-fixed": "#ffd9dc",
+            "on-primary": "#ffffff",
+            "on-tertiary": "#ffffff",
+            "on-primary-container": "#ff8998",
+            "secondary": "#7f5602",
+            "surface-bright": "#fdf8f6",
+            "tertiary": "#43221b",
+            "on-surface": "#1c1b1a",
+            "inverse-on-surface": "#f4f0ee",
+            "primary-fixed-dim": "#ffb2ba",
+            "primary-container": "#7a1c30",
+            "error": "#ba1a1a",
+            "surface-dim": "#ddd9d7",
+            "primary": "#5b021c",
+            "surface": "#fdf8f6",
+            "on-surface-variant": "#564243",
+            "surface-container-low": "#f7f3f0",
+            "on-secondary-fixed-variant": "#614000",
+            "on-error-container": "#93000a",
+            "tertiary-fixed-dim": "#f0baae",
+            "outline": "#897173",
+            "on-secondary-fixed": "#281800",
+            "surface-container-lowest": "#ffffff",
+            "on-primary-fixed-variant": "#832336",
+            "secondary-fixed-dim": "#f4bd67",
+            "outline-variant": "#dcc0c1",
+            "on-tertiary-fixed-variant": "#633d35",
+            "inverse-surface": "#31302f"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "0.75rem"
+          },
+          "spacing": {
+            "space-sm": "0.5rem",
+            "margin-desktop": "2rem",
+            "space-2xs": "0.125rem",
+            "space-md": "0.75rem",
+            "gutter-desktop": "1.5rem",
+            "margin-tablet": "1.5rem",
+            "space-2xl": "3rem",
+            "space-xs": "0.25rem",
+            "space-xl": "2rem",
+            "gutter": "1rem",
+            "space-lg": "1.25rem",
+            "margin": "1rem"
+          },
+          "fontFamily": {
+            "body-md": ["Plus Jakarta Sans"],
+            "numeric-table": ["Plus Jakarta Sans"],
+            "display-lg-mobile": ["Noto Serif"],
+            "display-lg": ["Noto Serif"],
+            "headline-md": ["Noto Serif"],
+            "title-md": ["Plus Jakarta Sans"],
+            "headline-sm": ["Noto Serif"],
+            "body-lg": ["Plus Jakarta Sans"],
+            "label-sm": ["Plus Jakarta Sans"],
+            "label-lg": ["Plus Jakarta Sans"],
+            "body-sm": ["Plus Jakarta Sans"],
+            "headline-lg": ["Noto Serif"]
+          },
+          "fontSize": {
+            "body-md": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "numeric-table": ["13px", { "lineHeight": "18px", "letterSpacing": "-0.01em", "fontWeight": "500" }],
+            "display-lg-mobile": ["30px", { "lineHeight": "38px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+            "display-lg": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+            "headline-md": ["22px", { "lineHeight": "30px", "letterSpacing": "-0.01em", "fontWeight": "500" }],
+            "title-md": ["15px", { "lineHeight": "22px", "letterSpacing": "0.005em", "fontWeight": "600" }],
+            "headline-sm": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+            "body-lg": ["15px", { "lineHeight": "24px", "fontWeight": "400" }],
+            "label-sm": ["10px", { "lineHeight": "14px", "letterSpacing": "0.06em", "fontWeight": "700" }],
+            "label-lg": ["12px", { "lineHeight": "16px", "letterSpacing": "0.04em", "fontWeight": "600" }],
+            "body-sm": ["12px", { "lineHeight": "18px", "fontWeight": "400" }],
+            "headline-lg": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.015em", "fontWeight": "600" }]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 350, 'GRAD' 0, 'opsz' 20;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    .custom-ring:focus-within {
+      box-shadow: 0 0 0 3px rgba(197, 147, 65, 0.22);
+      border-color: #7f5602;
+    }
+  </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col font-body-md antialiased selection:bg-primary selection:text-white">
+<!-- Top Micro-Status Bar -->
+<header class="w-full bg-surface-container-low/80 border-b border-outline-variant/30 backdrop-blur-md px-6 py-2 flex items-center justify-between z-30">
+<div class="flex items-center gap-3">
+<span class="w-2 h-2 rounded-full bg-emerald-700 animate-pulse"></span>
+<span class="font-label-sm text-label-sm tracking-wider uppercase text-on-surface-variant font-medium">
+        Infraestrutura ERP Segura • SEFAZ &amp; Omnichannel Sincronizados
+      </span>
+</div>
+<div class="hidden sm:flex items-center gap-4 text-on-surface-variant font-label-sm text-label-sm">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="lock">lock</span>
+        TLS 1.3 / AES-256
+      </span>
+<span class="text-outline-variant">•</span>
+<span class="text-on-surface-variant">Atelier Prestige v3.4.2</span>
+</div>
+</header>
+<!-- Main Split Architecture Viewport -->
+<main class="flex-1 flex flex-col lg:flex-row w-full overflow-hidden">
+<!-- LEFT PANEL: Hero & Atmospheric Luxury Brand Identity -->
+<section class="lg:w-[46%] xl:w-[48%] relative flex flex-col justify-between p-8 sm:p-12 lg:p-16 bg-surface-container-low border-r border-outline-variant/30 overflow-hidden">
+<!-- Ambient Gradient Radiance -->
+<div class="absolute -top-32 -left-32 w-96 h-96 bg-primary-container/10 rounded-full blur-3xl pointer-events-none"></div>
+<div class="absolute -bottom-40 -right-20 w-[28rem] h-[28rem] bg-secondary-container/20 rounded-full blur-3xl pointer-events-none"></div>
+<!-- Top Header & Brand Crest -->
+<div class="relative z-10">
+<div class="flex items-center gap-3.5 mb-8">
+<div class="w-11 h-11 rounded-lg bg-primary-container text-white flex items-center justify-center shadow-md border border-primary/20">
+<span class="material-symbols-outlined text-2xl" data-icon="auto_awesome">auto_awesome</span>
+</div>
+<div>
+<span class="font-label-sm text-label-sm tracking-[0.2em] text-secondary uppercase block font-semibold">Haute Parfumerie</span>
+<h1 class="font-headline-sm text-headline-sm text-primary tracking-tight font-bold">Maison Haute Parfumerie</h1>
+</div>
+</div>
+<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-container-high border border-outline-variant/40 mb-6">
+<span class="material-symbols-outlined text-sm text-secondary" data-icon="verified">verified</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Rede Curadora Credenciada</span>
+</div>
+<!-- Grand Editorial Headline -->
+<h2 class="font-headline-lg text-headline-lg lg:font-display-lg lg:text-display-lg text-on-surface mb-5 leading-tight font-serif max-w-xl">
+          Portal de Gestão Integrada &amp; Omnichannel de Alta Perfumaria
+        </h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-lg mb-8 leading-relaxed">
+          Plataforma analítica e operacional dedicada ao estoque de prestígio, rastreabilidade olfativa e conciliação financeira de boutiques físicas e canais digitais VIP.
+        </p>
+<!-- Brand Identifier Pills -->
+<div class="flex flex-wrap items-center gap-2.5 mb-10">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant mr-1 self-center">Portfólio:</span>
+<!-- O Boticário Badge -->
+<div class="inline-flex items-center gap-2 px-3 py-1.5 rounded bg-[#EBF5F0] border border-[#1B6B48]/20 text-[#1B6B48] font-body-sm font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-[#1B6B48]"></span>
+            O Boticário
+          </div>
+<!-- Eudora Badge -->
+<div class="inline-flex items-center gap-2 px-3 py-1.5 rounded bg-[#F6EDF4] border border-[#641D58]/20 text-[#641D58] font-body-sm font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-[#641D58]"></span>
+            Eudora
+          </div>
+<!-- O.U.i Paris Badge -->
+<div class="inline-flex items-center gap-2 px-3 py-1.5 rounded bg-[#F9F5EC] border border-[#8B6A2B]/20 text-[#8B6A2B] font-body-sm font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-[#8B6A2B]"></span>
+            O.U.i Paris
+          </div>
+</div>
+<!-- Olfactory Sensorial Vignette / Quote Card -->
+<div class="bg-surface-container-lowest/80 border border-outline-variant/30 rounded-lg p-5 backdrop-blur-sm shadow-sm max-w-lg">
+<div class="flex items-start gap-3.5">
+<span class="material-symbols-outlined text-secondary text-2xl" data-icon="format_quote">format_quote</span>
+<div>
+<p class="font-headline-sm text-headline-sm text-tertiary italic font-serif leading-snug mb-2">
+                "A excelência olfativa reside no equilíbrio minucioso entre arte rara, lote preservado e entrega sensorial sem atritos."
+              </p>
+<div class="flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm tracking-wide">
+<span>Conselho Consultor de Alta Perfumaria</span>
+<span class="text-secondary font-semibold">Grimaud &amp; Associés</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Realtime Operations Ribbon at Left Footer -->
+<div class="relative z-10 pt-8 mt-8 border-t border-outline-variant/30">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-on-surface-variant font-body-sm">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-base" data-icon="storefront">storefront</span>
+<span>3 Boutiques Físicas Conectadas</span>
+</div>
+<span class="hidden sm:inline text-outline-variant">•</span>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-base" data-icon="bolt">bolt</span>
+<span>E-commerce VIP Ativo</span>
+</div>
+<span class="hidden sm:inline text-outline-variant">•</span>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-emerald-800 text-base" data-icon="sync_saved_locally">sync_saved_locally</span>
+<span>Estoque Sincronizado com SEFAZ</span>
+</div>
+</div>
+</div>
+</section>
+<!-- RIGHT PANEL: High Security ERP Authentication Form -->
+<section class="lg:w-[54%] xl:w-[52%] flex flex-col justify-center items-center p-6 sm:p-12 lg:p-16 bg-surface-container-lowest overflow-y-auto">
+<div class="w-full max-w-xl">
+<!-- Form Header -->
+<div class="mb-8">
+<div class="flex items-center justify-between mb-2">
+<div class="inline-flex items-center gap-2 text-primary font-label-sm text-label-sm font-bold tracking-widest uppercase">
+<span class="material-symbols-outlined text-base" data-icon="shield_person">shield_person</span>
+              Ambiente de Acesso Restrito
+            </div>
+<span class="px-2.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm">
+              Terminal POS #04-BR
+            </span>
+</div>
+<h2 class="font-headline-md text-headline-md text-on-surface font-serif">Entre com suas credenciais corporativas</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">
+            Selecione a franquia alocada e informe seu ID para autenticação multifatorial.
+          </p>
+</div>
+<!-- Unit / Boutique Switcher Pills -->
+<div class="mb-7">
+<label class="block font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant mb-2.5">
+            Unidade de Atendimento / Franquia Ativa
+          </label>
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 p-1 bg-surface-container-low border border-outline-variant/40 rounded-lg">
+<button class="px-3 py-2 text-center rounded bg-primary-container text-white font-title-md text-body-sm font-medium shadow-sm transition-all text-xs flex flex-col items-center justify-center" type="button">
+<span>Flagship Morumbi</span>
+<span class="text-[9px] text-white/70 tracking-normal font-normal">São Paulo • SP</span>
+</button>
+<button class="px-3 py-2 text-center rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all text-xs flex flex-col items-center justify-center" type="button">
+<span>Boutique Jardins</span>
+<span class="text-[9px] text-outline tracking-normal font-normal">São Paulo • SP</span>
+</button>
+<button class="px-3 py-2 text-center rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all text-xs flex flex-col items-center justify-center" type="button">
+<span>Curitiba Flagship</span>
+<span class="text-[9px] text-outline tracking-normal font-normal">Batel • PR</span>
+</button>
+<button class="px-3 py-2 text-center rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all text-xs flex flex-col items-center justify-center" type="button">
+<span>Matriz &amp; Controladoria</span>
+<span class="text-[9px] text-outline tracking-normal font-normal">Corporate Desk</span>
+</button>
+</div>
+</div>
+<!-- Login Form -->
+<form class="space-y-5" onsubmit="event.preventDefault();">
+<!-- Corporate ID / Email -->
+<div>
+<div class="flex items-center justify-between mb-1.5">
+<label class="font-label-lg text-label-lg text-on-surface" for="corporate-id">
+                E-mail Corporativo ou ID de Consultor(a)
+              </label>
+<span class="font-label-sm text-label-sm text-outline">Ex: gestor@boticariofranquia.com.br</span>
+</div>
+<div class="relative custom-ring rounded">
+<div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-on-surface-variant">
+<span class="material-symbols-outlined text-lg" data-icon="badge">badge</span>
+</div>
+<input class="w-full pl-10 pr-4 py-2.5 bg-surface-container-lowest border border-outline-variant/50 rounded text-on-surface font-body-md text-body-md focus:outline-none transition-colors" id="corporate-id" name="corporate-id" placeholder="nome.sobrenome@atelierprestige.com.br" required="" type="text" value="cecilia.haute@atelierprestige.com.br"/>
+</div>
+</div>
+<!-- Password Field with Toggle -->
+<div>
+<div class="flex items-center justify-between mb-1.5">
+<label class="font-label-lg text-label-lg text-on-surface" for="password">
+                Senha de Acesso Criptografada
+              </label>
+<a class="font-body-sm text-body-sm text-secondary hover:text-primary transition-colors font-medium" href="#recuperar-chave">
+                Esqueceu sua chave de acesso?
+              </a>
+</div>
+<div class="relative custom-ring rounded">
+<div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-on-surface-variant">
+<span class="material-symbols-outlined text-lg" data-icon="key">key</span>
+</div>
+<input class="w-full pl-10 pr-11 py-2.5 bg-surface-container-lowest border border-outline-variant/50 rounded text-on-surface font-body-md text-body-md focus:outline-none transition-colors" id="password" name="password" placeholder="••••••••••••••••" required="" type="password" value="HauteParfumerie2025#"/>
+<button aria-label="Alternar visibilidade de senha" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-on-surface-variant hover:text-on-surface transition-colors" id="toggle-password" type="button">
+<span class="material-symbols-outlined text-xl" data-icon="visibility">visibility</span>
+</button>
+</div>
+</div>
+<!-- Profile / Privilege Level Selector -->
+<div>
+<label class="block font-label-lg text-label-lg text-on-surface mb-1.5" for="role-select">
+              Nível de Alçada &amp; Perfil Operacional
+            </label>
+<div class="relative custom-ring rounded">
+<div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-on-surface-variant">
+<span class="material-symbols-outlined text-lg" data-icon="admin_panel_settings">admin_panel_settings</span>
+</div>
+<select class="w-full pl-10 pr-10 py-2.5 bg-surface-container-lowest border border-outline-variant/50 rounded text-on-surface font-body-md text-body-md focus:outline-none appearance-none cursor-pointer" id="role-select" name="role-select">
+<option selected="" value="gestor">Gestor Franqueado Multimarcas (Acesso Total &amp; DRE)</option>
+<option value="consultor">Consultor Perfumista / PDV Terminal Caixa</option>
+<option value="estoquista">Supervisor de Lotes, Validades &amp; Almoxarifado</option>
+<option value="controladoria">Controladoria, Escrita Fiscal &amp; Sped</option>
+<option value="conciliador">Operador de Conciliação Bancária / Omnichannel</option>
+</select>
+<div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-on-surface-variant">
+<span class="material-symbols-outlined text-lg" data-icon="unfold_more">unfold_more</span>
+</div>
+</div>
+</div>
+<!-- Remember session checkbox & Terminal token -->
+<div class="flex items-center justify-between pt-1">
+<label class="flex items-center gap-2.5 cursor-pointer select-none">
+<input checked="" class="w-4 h-4 rounded border-outline text-primary-container focus:ring-secondary/30 transition-colors" type="checkbox"/>
+<span class="font-body-md text-body-md text-on-surface-variant">
+                Lembrar minha sessão neste terminal seguro
+              </span>
+</label>
+<span class="font-label-sm text-label-sm text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/60 flex items-center gap-1">
+<span class="material-symbols-outlined text-xs" data-icon="verified_user">verified_user</span>
+              Certificado Ativo
+            </span>
+</div>
+<!-- Primary Submit Button -->
+<div class="pt-2">
+<button class="w-full bg-primary-container hover:bg-primary text-white font-title-md text-title-md py-3 px-6 rounded shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 group active:scale-[0.99]" type="submit">
+<span class="material-symbols-outlined text-xl group-hover:translate-x-0.5 transition-transform" data-icon="lock_open">lock_open</span>
+<span>Acessar Atelier Prestige ERP</span>
+<span class="material-symbols-outlined text-lg opacity-80" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+<!-- Divider -->
+<div class="relative flex py-2 items-center">
+<div class="flex-grow border-t border-outline-variant/40"></div>
+<span class="flex-shrink mx-4 font-label-sm text-label-sm text-outline uppercase tracking-wider">
+              Alternativas de Verificação Segura
+            </span>
+<div class="flex-grow border-t border-outline-variant/40"></div>
+</div>
+<!-- Fast Biometrics & Corporate 2FA Quick Actions -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+<button class="flex items-center justify-center gap-2.5 py-2.5 px-4 rounded bg-surface-container-low hover:bg-surface-container border border-outline-variant/40 text-on-surface font-title-md text-body-sm transition-all hover:border-secondary/40" type="button">
+<span class="material-symbols-outlined text-secondary text-lg" data-icon="fingerprint">fingerprint</span>
+<span>Biometria / FIDO2</span>
+</button>
+<button class="flex items-center justify-center gap-2.5 py-2.5 px-4 rounded bg-surface-container-low hover:bg-surface-container border border-outline-variant/40 text-on-surface font-title-md text-body-sm transition-all hover:border-secondary/40" type="button">
+<span class="material-symbols-outlined text-primary text-lg" data-icon="security_update_good">security_update_good</span>
+<span>2FA Grupo Boticário</span>
+</button>
+</div>
+</form>
+<!-- Compliance & Regulatory Footer -->
+<div class="mt-8 pt-6 border-t border-outline-variant/30 text-center">
+<div class="flex items-center justify-center gap-2 text-on-surface-variant font-label-sm text-label-sm mb-1.5">
+<span class="material-symbols-outlined text-sm text-emerald-800" data-icon="encrypted">encrypted</span>
+<span>Conexão Criptografada SSL 256-bit</span>
+<span class="text-outline-variant">•</span>
+<span>Conformidade LGPD &amp; Auditoria Fiscal</span>
+</div>
+<p class="text-outline font-body-sm text-[11px]">
+            Uso estritamente monitorado. Atribuição de responsabilidade por emissão de NFC-e e transferências entre depósitos regulamentadas sob contrato de franquia.
+          </p>
+</div>
+</div>
+</section>
+</main>
+<!-- Interactive script for demo toggles -->
+<script>
+    // Password visibility toggle
+    const toggleBtn = document.getElementById('toggle-password');
+    const pwdInput = document.getElementById('password');
+
+    if (toggleBtn && pwdInput) {
+      toggleBtn.addEventListener('click', () => {
+        const isPassword = pwdInput.getAttribute('type') === 'password';
+        pwdInput.setAttribute('type', isPassword ? 'text' : 'password');
+        const iconSpan = toggleBtn.querySelector('.material-symbols-outlined');
+        if (iconSpan) {
+          iconSpan.textContent = isPassword ? 'visibility_off' : 'visibility';
+        }
+      });
+    }
+
+    // Boutique switcher pill interaction
+    const boutiqueButtons = document.querySelectorAll('button[type="button"] span:first-child');
+    boutiqueButtons.forEach(span => {
+      const btn = span.closest('button');
+      if (btn && btn.parentElement.classList.contains('grid-cols-2')) {
+        btn.addEventListener('click', () => {
+          btn.parentElement.querySelectorAll('button').forEach(b => {
+            b.className = 'px-3 py-2 text-center rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all text-xs flex flex-col items-center justify-center';
+            const sub = b.querySelector('span:last-child');
+            if (sub) sub.className = 'text-[9px] text-outline tracking-normal font-normal';
+          });
+          btn.className = 'px-3 py-2 text-center rounded bg-primary-container text-white font-title-md text-body-sm font-medium shadow-sm transition-all text-xs flex flex-col items-center justify-center';
+          const activeSub = btn.querySelector('span:last-child');
+          if (activeSub) activeSub.className = 'text-[9px] text-white/70 tracking-normal font-normal';
+        });
+      }
+    });
+  </script>
+</body></html>

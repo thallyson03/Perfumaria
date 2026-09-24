@@ -1,0 +1,26 @@
+{
+  "name": "revendedor",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev -w @revendedor/api",
+    "dev:admin": "npm run dev -w @revendedor/admin",
+    "dev:storefront": "npm run dev -w @revendedor/storefront",
+    "db:generate": "npm run generate -w @revendedor/database",
+    "db:migrate": "npm run migrate:deploy -w @revendedor/database",
+    "db:migrate:dev": "npm run migrate -w @revendedor/database",
+    "db:studio": "npm run studio -w @revendedor/database",
+    "db:verify-rls": "tsx packages/database/scripts/verify-rls.ts",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
