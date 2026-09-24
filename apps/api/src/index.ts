@@ -1,4 +1,10 @@
 import "dotenv/config";
+
+// Em produção (e preferencialmente em dev) a API usa o role sem BYPASSRLS.
+if (process.env.DATABASE_URL_APP) {
+  process.env.DATABASE_URL = process.env.DATABASE_URL_APP;
+}
+
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mkdir } from "node:fs/promises";

@@ -6,7 +6,10 @@ import { CheckoutShell } from "@/components/checkout/checkout-shell";
 import { OrderDetail } from "@/components/order-detail";
 import { fetchPublicOrder } from "@/lib/orders";
 
-const ROOT_DOMAIN = process.env.ROOT_DOMAIN ?? "localhost";
+const ROOT_DOMAIN =
+  process.env.NEXT_PUBLIC_ROOT_DOMAIN ??
+  process.env.ROOT_DOMAIN ??
+  "localhost";
 
 function tenantDomain(subdomain: string) {
   return `${subdomain}.${ROOT_DOMAIN}`;

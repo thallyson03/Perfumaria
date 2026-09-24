@@ -25,7 +25,10 @@ import {
 } from "@/lib/cart-api";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
-const ROOT_DOMAIN = process.env.ROOT_DOMAIN ?? "localhost";
+const ROOT_DOMAIN =
+  process.env.NEXT_PUBLIC_ROOT_DOMAIN ??
+  process.env.ROOT_DOMAIN ??
+  "localhost";
 
 type StoreConfig = StoreDeliveryConfig & {
   name: string;

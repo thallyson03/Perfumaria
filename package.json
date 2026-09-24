@@ -9,13 +9,15 @@
     "dev:api": "npm run dev -w @revendedor/api",
     "dev:admin": "npm run dev -w @revendedor/admin",
     "dev:storefront": "npm run dev -w @revendedor/storefront",
+    "build": "npm run build -w @revendedor/admin && npm run build -w @revendedor/storefront",
     "db:generate": "npm run generate -w @revendedor/database",
     "db:migrate": "npm run migrate:deploy -w @revendedor/database",
     "db:migrate:dev": "npm run migrate -w @revendedor/database",
     "db:studio": "npm run studio -w @revendedor/database",
     "db:verify-rls": "tsx packages/database/scripts/verify-rls.ts",
     "docker:up": "docker compose up -d",
-    "docker:down": "docker compose down"
+    "docker:down": "docker compose down",
+    "docker:prod": "docker compose -f docker-compose.prod.yml up -d --build"
   },
   "devDependencies": {
     "tsx": "^4.19.3"

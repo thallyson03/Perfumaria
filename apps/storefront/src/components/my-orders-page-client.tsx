@@ -6,7 +6,10 @@ import { OrderListItem } from "@/components/order-detail";
 import { loadCustomerSession } from "@/lib/customer-session";
 import { fetchMyOrders, type OrderSummary } from "@/lib/orders";
 
-const ROOT_DOMAIN = process.env.ROOT_DOMAIN ?? "localhost";
+const ROOT_DOMAIN =
+  process.env.NEXT_PUBLIC_ROOT_DOMAIN ??
+  process.env.ROOT_DOMAIN ??
+  "localhost";
 
 function tenantDomain(subdomain: string) {
   return `${subdomain}.${ROOT_DOMAIN}`;

@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const ROOT_DOMAIN = process.env.ROOT_DOMAIN ?? "localhost";
+const ROOT_DOMAIN =
+  process.env.NEXT_PUBLIC_ROOT_DOMAIN ??
+  process.env.ROOT_DOMAIN ??
+  "localhost";
 
 export function middleware(req: NextRequest) {
   const hostname = req.headers.get("host") || "";

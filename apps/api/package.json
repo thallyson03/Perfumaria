@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "set NODE_OPTIONS=--use-system-ca&& tsx watch src/index.ts",
-    "build": "tsc",
-    "start": "set NODE_OPTIONS=--use-system-ca&& node dist/index.js"
+    "dev": "tsx watch src/index.ts",
+    "build": "node -e \"console.log('api: runtime via tsx')\"",
+    "start": "tsx src/index.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.0.1",
@@ -21,12 +21,12 @@
     "fastify": "^5.2.1",
     "fastify-plugin": "^6.0.0",
     "ioredis": "^5.6.0",
+    "tsx": "^4.19.3",
     "zod": "^3.24.2"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.13.10",
-    "tsx": "^4.19.3",
     "typescript": "^5.8.2"
   }
 }

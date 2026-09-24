@@ -135,6 +135,9 @@ export function mediaUrl(pathOrUrl: string | null | undefined): string | null {
 }
 
 export function tenantDomain(subdomain: string) {
-  const ROOT = process.env.ROOT_DOMAIN ?? "localhost";
+  const ROOT =
+    process.env.NEXT_PUBLIC_ROOT_DOMAIN ??
+    process.env.ROOT_DOMAIN ??
+    "localhost";
   return `${subdomain}.${ROOT}`;
 }

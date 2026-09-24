@@ -1,0 +1,40 @@
+# syntax=docker/dockerfile:1
+
+FROM node:20-alpine AS base
+WORKDIR /app
+RUN apk add --no-cache libc6-compat wget
+
+FROM base AS deps
+COPY package.json package-lock.json ./
+COPY apps/api/package.json ./apps/api/
+COPY apps/admin/package.json ./apps/admin/
+COPY apps/storefront/package.json ./apps/storefront/
+COPY packages/database/package.json ./packages/database/
+RUN npm ci
+
+FROM deps AS build
+COPY apps/storefront ./apps/storefront
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_ROOT_DOMAIN
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_ROOT_DOMAIN=$NEXT_PUBLIC_ROOT_DOMAIN
+ENV ROOT_DOMAIN=$NEXT_PUBLIC_ROOT_DOMAIN
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN npm run build -w @revendedor/storefront
+
+FROM base AS runner
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+WORKDIR /app
+
+COPY --from=build /app/apps/storefront/.next/standalone ./
+COPY --from=build /app/apps/storefront/.next/static ./apps/storefront/.next/static
+
+ENV PORT=3002
+ENV HOSTNAME=0.0.0.0
+EXPOSE 3002
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=5 \
+  CMD wget -qO- http://127.0.0.1:3002/ || exit 1
+
+CMD ["node", "apps/storefront/server.js"]

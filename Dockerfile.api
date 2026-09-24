@@ -1,0 +1,43 @@
+# syntax=docker/dockerfile:1
+
+FROM node:20-alpine AS base
+WORKDIR /app
+RUN apk add --no-cache libc6-compat openssl wget
+
+FROM base AS deps
+COPY package.json package-lock.json ./
+COPY apps/api/package.json ./apps/api/
+COPY apps/admin/package.json ./apps/admin/
+COPY apps/storefront/package.json ./apps/storefront/
+COPY packages/database/package.json ./packages/database/
+RUN npm ci
+
+FROM deps AS build
+COPY packages/database ./packages/database
+COPY apps/api ./apps/api
+COPY scripts ./scripts
+ENV DATABASE_URL="postgresql://build:build@localhost:5432/build?schema=public"
+RUN npm run generate -w @revendedor/database
+
+FROM base AS runner
+ENV NODE_ENV=production
+WORKDIR /app
+
+COPY --from=build /app/package.json /app/package-lock.json ./
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/packages/database ./packages/database
+COPY --from=build /app/apps/api ./apps/api
+COPY --from=build /app/scripts ./scripts
+
+RUN chmod +x /app/scripts/api-entrypoint.sh \
+  && mkdir -p /app/uploads
+
+ENV API_PORT=3001
+ENV API_HOST=0.0.0.0
+ENV UPLOAD_DIR=/app/uploads
+
+EXPOSE 3001
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=5 \
+  CMD wget -qO- http://127.0.0.1:3001/health || exit 1
+
+CMD ["/app/scripts/api-entrypoint.sh"]

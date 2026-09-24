@@ -1,0 +1,108 @@
+# Produção — Coolify (Docker Compose)
+# No Coolify: New Resource → Docker Compose → este repositório / docker-compose.prod.yml
+# Atribua domínios aos serviços api (3001), admin (3000) e storefront (3002).
+# Vitrine: domínio wildcard *.seudominio.com → storefront.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-revendedor}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-revendedor}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--notify-keyspace-events", "Ex", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      API_HOST: 0.0.0.0
+      API_PORT: 3001
+      UPLOAD_DIR: /app/uploads
+      ROOT_DOMAIN: ${ROOT_DOMAIN:?defina ROOT_DOMAIN}
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://revendedor_app:${APP_DB_PASSWORD:?defina APP_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-revendedor}?schema=public
+      DATABASE_URL_ADMIN: postgresql://${POSTGRES_USER:-revendedor}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-revendedor}?schema=public
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+      CART_RESERVE_TTL_SECONDS: ${CART_RESERVE_TTL_SECONDS:-900}
+      ORDER_WHATSAPP_TTL_SECONDS: ${ORDER_WHATSAPP_TTL_SECONDS:-3600}
+      ORDER_PAYMENT_TTL_SECONDS: ${ORDER_PAYMENT_TTL_SECONDS:-1800}
+      N8N_ALERTS_WEBHOOK_URL: ${N8N_ALERTS_WEBHOOK_URL:-}
+    volumes:
+      - uploads_data:/app/uploads
+    ports:
+      - "${API_PUBLISH_PORT:-3001}:3001"
+
+  admin:
+    build:
+      context: .
+      dockerfile: Dockerfile.admin
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?defina NEXT_PUBLIC_API_URL}
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+    ports:
+      - "${ADMIN_PUBLISH_PORT:-3000}:3000"
+
+  storefront:
+    build:
+      context: .
+      dockerfile: Dockerfile.storefront
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?defina NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_ROOT_DOMAIN: ${ROOT_DOMAIN:?defina ROOT_DOMAIN}
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      HOSTNAME: 0.0.0.0
+      ROOT_DOMAIN: ${ROOT_DOMAIN}
+      NEXT_PUBLIC_ROOT_DOMAIN: ${ROOT_DOMAIN}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    ports:
+      - "${STOREFRONT_PUBLISH_PORT:-3002}:3002"
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads_data:

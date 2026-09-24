@@ -1,6 +1,6 @@
 # Revendedor — SaaS multi-tenant (Fase 1)
 
-Fundação local com **Node (Fastify)**, **Next.js**, **Prisma**, **PostgreSQL + RLS** e **Redis**.
+Fundação com **Node (Fastify)**, **Next.js**, **Prisma**, **PostgreSQL + RLS** e **Redis**.
 
 ## Estrutura
 
@@ -19,7 +19,7 @@ packages/database Prisma + helper withTenant()
 > Se `npm install` ou o Prisma falharem com erro de certificado (`UNABLE_TO_VERIFY_LEAF_SIGNATURE`), use temporariamente:
 > `npm install --strict-ssl false` e ` $env:NODE_OPTIONS="--use-system-ca"` (PowerShell) antes do `prisma generate` / migrate.
 
-## Setup rápido
+## Setup rápido (dev)
 
 ```bash
 # 1. Infra local
@@ -31,10 +31,11 @@ cp .env.example apps/storefront/.env.local
 
 npm run docker:up
 npm install
+npm run db:generate
 
 # 2. Schema + RLS
 $env:NODE_OPTIONS="--use-system-ca"   # se houver erro de certificado SSL
-npm run db:migrate
+npm run db:migrate:dev
 
 # 3. Subir serviços (3 terminais)
 npm run dev:api
@@ -48,12 +49,18 @@ npm run dev:storefront
 - API health: http://localhost:3001/health  
 - Vitrine (ex.): http://loja.localhost:3002  
 
+## Produção (Coolify)
+
+Guia completo: [`docs/COOLIFY.md`](docs/COOLIFY.md)
+
+Resumo: recurso **Docker Compose** apontando para `docker-compose.prod.yml`, variáveis de `.env.production.example`, domínios `api` / `admin` / wildcard da vitrine.
+
 ## Segurança multi-tenant
 
 1. Toda tabela sensível tem `tenant_id` + **RLS** + **FORCE RLS**.
 2. A API conecta com o role `revendedor_app` (**sem** `BYPASSRLS`). Migrations usam o superuser `revendedor`.
 3. Antes das queries a API roda `SET LOCAL app.current_tenant = '<uuid>'` dentro de uma transação (`withTenant`).
-4. JWT do painel e da vitrine carregam `tenantId`; checkout futuro compara JWT × domínio (`X-Tenant-Domain`).
+4. JWT do painel e da vitrine carregam `tenantId`; checkout compara JWT × domínio (`X-Tenant-Domain`).
 5. Resolução de subdomínio → UUID usa **Redis** (`tenant_domain:*`) com fallback no Postgres (`tenants` sem RLS).
 
 ## Status da implementação (atual)
@@ -64,5 +71,4 @@ npm run dev:storefront
 - Dashboard: Redis (hoje) + `secure_monthly_sales` + top dívidas — **ok**
 - Workers: overdue, debt summaries, fila `alerts:whatsapp`, refresh MV — **ok**
 - Vitrine: carrinho + login cliente + checkout (validação dupla JWT×domínio) — **ok**
-- n8n/Evolution em produção / Coolify — **pendente** (fila Redis + `N8N_ALERTS_WEBHOOK_URL` prontos)
- 
+- Deploy Coolify (Docker Compose + Dockerfiles) — **ok** (configure DNS + envs)
