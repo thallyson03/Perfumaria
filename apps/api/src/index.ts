@@ -47,6 +47,9 @@ async function main() {
   });
 
   await app.register(helmet, {
+    // API JSON: CSP padrão do Helmet (script-src 'none') gera ruído
+    // no console se alguém abrir a URL no navegador; não serve HTML.
+    contentSecurityPolicy: false,
     crossOriginResourcePolicy: { policy: "cross-origin" },
   });
   await app.register(cors, {
