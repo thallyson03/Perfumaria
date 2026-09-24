@@ -23,12 +23,9 @@ import {
   releaseAllCartLines,
   syncCartReservations,
 } from "@/lib/cart-api";
+import { storeHref, tenantDomain } from "@/lib/store-url";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
-const ROOT_DOMAIN =
-  process.env.NEXT_PUBLIC_ROOT_DOMAIN ??
-  process.env.ROOT_DOMAIN ??
-  "localhost";
 
 type StoreConfig = StoreDeliveryConfig & {
   name: string;
@@ -62,10 +59,6 @@ type CartItem = {
 };
 
 type CheckoutStep = "cart" | "fulfillment" | "whatsapp" | "pix" | "pix_waiting";
-
-function tenantDomain(subdomain: string) {
-  return `${subdomain}.${ROOT_DOMAIN}`;
-}
 
 function cartStorageKey(subdomain: string) {
   return `revendedor_cart_${subdomain}`;
@@ -524,7 +517,9 @@ export function StoreClient({ subdomain }: { subdomain: string }) {
             setCartOpen(false);
             setPixData(null);
             setStep("cart");
-            router.push(`/pedido/${pixData.publicCode}?paid=1`);
+            router.push(
+              storeHref(subdomain, `/pedido/${pixData.publicCode}?paid=1`)
+            );
           } else if (
             order.status === "cancelled" ||
             order.status === "expired"
@@ -577,7 +572,7 @@ export function StoreClient({ subdomain }: { subdomain: string }) {
       clearCart();
       setCartOpen(false);
       window.open(data.whatsappUrl as string, "_blank");
-      router.push(`/pedido/${data.publicCode as string}`);
+      router.push(storeHref(subdomain, `/pedido/${data.publicCode as string}`));
     } finally {
       setLoading(false);
     }
@@ -704,7 +699,7 @@ export function StoreClient({ subdomain }: { subdomain: string }) {
             <button
               type="button"
               className="store-cart-btn"
-              onClick={() => router.push("/checkout")}
+              onClick={() => router.push(storeHref(subdomain, "/checkout"))}
               aria-label={`Sacola com ${cartCount} itens`}
             >
               <ShoppingBagIcon />
@@ -1054,7 +1049,9 @@ export function StoreClient({ subdomain }: { subdomain: string }) {
                 type="button"
                 className="btn-outline"
                 onClick={() => {
-                  router.push(`/pedido/${pixData.publicCode}`);
+                  router.push(
+                    storeHref(subdomain, `/pedido/${pixData.publicCode}`)
+                  );
                 }}
               >
                 Ver pedido
@@ -1225,7 +1222,7 @@ export function StoreClient({ subdomain }: { subdomain: string }) {
                 disabled={loading}
                 onClick={() => {
                   setCartOpen(false);
-                  router.push("/checkout");
+                  router.push(storeHref(subdomain, "/checkout"));
                 }}
               >
                 Ir para a sacola
@@ -1235,7 +1232,7 @@ export function StoreClient({ subdomain }: { subdomain: string }) {
                 className="btn-outline"
                 onClick={() => {
                   setCartOpen(false);
-                  router.push("/checkout/entrega");
+                  router.push(storeHref(subdomain, "/checkout/entrega"));
                 }}
               >
                 Seguir para identificação

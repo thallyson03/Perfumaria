@@ -19,6 +19,7 @@ import {
   type CartItem,
 } from "@/lib/cart-storage";
 import { loadGuestDelivery } from "@/lib/delivery";
+import { storeHref } from "@/lib/store-url";
 
 type StoreConfig = {
   name: string;
@@ -114,25 +115,33 @@ export function CheckoutCartClient({ subdomain }: { subdomain: string }) {
 
   const continueCheckout = useCallback(() => {
     if (items.length === 0) return;
-    router.push("/checkout/entrega");
+    router.push(storeHref(subdomain, "/checkout/entrega"));
   }, [items.length, router]);
 
   if (!ready) {
     return (
-      <CheckoutShell current={1} storeName={config?.name ?? subdomain}>
+      <CheckoutShell
+        current={1}
+        storeName={config?.name ?? subdomain}
+        subdomain={subdomain}
+      >
         <p className="checkout-loading">Carregando sacola…</p>
       </CheckoutShell>
     );
   }
 
   return (
-    <CheckoutShell current={1} storeName={config?.name ?? subdomain}>
+    <CheckoutShell
+      current={1}
+      storeName={config?.name ?? subdomain}
+      subdomain={subdomain}
+    >
       {message && <div className="checkout-toast">{message}</div>}
       {items.length === 0 ? (
         <div className="checkout-empty">
           <h1>Sua sacola está vazia</h1>
           <p>Adicione fragrâncias na vitrine para continuar.</p>
-          <Link href="/" className="btn-primary">
+          <Link href={storeHref(subdomain)} className="btn-primary">
             Voltar à vitrine
           </Link>
         </div>
@@ -240,7 +249,7 @@ export function CheckoutCartClient({ subdomain }: { subdomain: string }) {
               })}
             </div>
 
-            <Link href="/" className="checkout-back">
+            <Link href={storeHref(subdomain)} className="checkout-back">
               ← Continuar comprando
             </Link>
           </section>

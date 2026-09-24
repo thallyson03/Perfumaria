@@ -5,15 +5,7 @@ import Link from "next/link";
 import { OrderListItem } from "@/components/order-detail";
 import { loadCustomerSession } from "@/lib/customer-session";
 import { fetchMyOrders, type OrderSummary } from "@/lib/orders";
-
-const ROOT_DOMAIN =
-  process.env.NEXT_PUBLIC_ROOT_DOMAIN ??
-  process.env.ROOT_DOMAIN ??
-  "localhost";
-
-function tenantDomain(subdomain: string) {
-  return `${subdomain}.${ROOT_DOMAIN}`;
-}
+import { storeHref, tenantDomain } from "@/lib/store-url";
 
 export function MyOrdersPageClient({ subdomain }: { subdomain: string }) {
   const domain = tenantDomain(subdomain);
@@ -37,7 +29,7 @@ export function MyOrdersPageClient({ subdomain }: { subdomain: string }) {
 
   return (
     <main className="order-shell">
-      <Link href="/" className="order-back-link">
+      <Link href={storeHref(subdomain)} className="order-back-link">
         ← Voltar à loja
       </Link>
       <header className="order-header">
@@ -57,7 +49,7 @@ export function MyOrdersPageClient({ subdomain }: { subdomain: string }) {
             <OrderListItem
               key={order.publicCode}
               order={order}
-              href={`/pedido/${order.publicCode}`}
+              href={storeHref(subdomain, `/pedido/${order.publicCode}`)}
             />
           ))}
         </div>

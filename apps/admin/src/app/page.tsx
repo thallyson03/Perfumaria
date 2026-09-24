@@ -209,7 +209,7 @@ export default function HomePage() {
                 />
                 <span className="login-hint">
                   Só minúsculas, números e hífen · vitrine em{" "}
-                  {subdomain || "loja"}.localhost
+                  https://lojas…/{subdomain || "loja"}
                 </span>
               </label>
 

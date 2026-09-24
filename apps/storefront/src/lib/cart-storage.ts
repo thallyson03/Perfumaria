@@ -134,10 +134,8 @@ export function mediaUrl(pathOrUrl: string | null | undefined): string | null {
   return `${API}${pathOrUrl.startsWith("/") ? "" : "/"}${pathOrUrl}`;
 }
 
+import { tenantDomain as resolveTenantDomain } from "./store-url";
+
 export function tenantDomain(subdomain: string) {
-  const ROOT =
-    process.env.NEXT_PUBLIC_ROOT_DOMAIN ??
-    process.env.ROOT_DOMAIN ??
-    "localhost";
-  return `${subdomain}.${ROOT}`;
+  return resolveTenantDomain(subdomain);
 }

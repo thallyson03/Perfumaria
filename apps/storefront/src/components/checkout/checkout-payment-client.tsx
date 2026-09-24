@@ -26,6 +26,7 @@ import {
   type FulfillmentSelection,
   type ShippingQuote,
 } from "@/lib/delivery";
+import { storeHref } from "@/lib/store-url";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -71,7 +72,7 @@ export function CheckoutPaymentClient({ subdomain }: { subdomain: string }) {
     const cart = loadCartItems(subdomain);
     setItems(cart);
     if (cart.length === 0) {
-      router.replace("/checkout");
+      router.replace(storeHref(subdomain, "/checkout"));
       return;
     }
 
@@ -85,11 +86,11 @@ export function CheckoutPaymentClient({ subdomain }: { subdomain: string }) {
       try {
         setCustomer(JSON.parse(raw) as CustomerDraft);
       } catch {
-        router.replace("/checkout/entrega");
+        router.replace(storeHref(subdomain, "/checkout/entrega"));
         return;
       }
     } else {
-      router.replace("/checkout/entrega");
+      router.replace(storeHref(subdomain, "/checkout/entrega"));
       return;
     }
 
@@ -195,7 +196,7 @@ export function CheckoutPaymentClient({ subdomain }: { subdomain: string }) {
       if (data.whatsappUrl) {
         window.open(data.whatsappUrl as string, "_blank");
       }
-      router.push(`/pedido/${data.publicCode as string}`);
+      router.push(storeHref(subdomain, `/pedido/${data.publicCode as string}`));
     } finally {
       setLoading(false);
     }
@@ -251,7 +252,11 @@ export function CheckoutPaymentClient({ subdomain }: { subdomain: string }) {
 
   if (pixData) {
     return (
-      <CheckoutShell current={4} storeName={config?.name ?? subdomain}>
+      <CheckoutShell
+        current={4}
+        storeName={config?.name ?? subdomain}
+        subdomain={subdomain}
+      >
         <div className="checkout-confirm">
           <div className="checkout-confirm-badge">✓</div>
           <h1 className="checkout-h1">Pedido realizado com sucesso!</h1>
@@ -289,12 +294,12 @@ export function CheckoutPaymentClient({ subdomain }: { subdomain: string }) {
             )}
             <div className="checkout-nav-row">
               <Link
-                href={`/pedido/${pixData.publicCode}`}
+                href={storeHref(subdomain, `/pedido/${pixData.publicCode}`)}
                 className="btn-outline"
               >
                 Acompanhar pedido
               </Link>
-              <Link href="/" className="btn-outline">
+              <Link href={storeHref(subdomain)} className="btn-outline">
                 Voltar à vitrine
               </Link>
             </div>
@@ -306,7 +311,11 @@ export function CheckoutPaymentClient({ subdomain }: { subdomain: string }) {
   }
 
   return (
-    <CheckoutShell current={3} storeName={config?.name ?? subdomain}>
+    <CheckoutShell
+      current={3}
+      storeName={config?.name ?? subdomain}
+      subdomain={subdomain}
+    >
       {message && <div className="checkout-toast">{message}</div>}
       <div className="checkout-grid">
         <section className="checkout-col">
@@ -353,7 +362,10 @@ export function CheckoutPaymentClient({ subdomain }: { subdomain: string }) {
                 </p>
                 <form onSubmit={submitWhatsApp}>
                   <div className="checkout-nav-row">
-                    <Link href="/checkout/entrega" className="checkout-back">
+                    <Link
+                      href={storeHref(subdomain, "/checkout/entrega")}
+                      className="checkout-back"
+                    >
                       ← Voltar para entrega
                     </Link>
                     <button
@@ -378,7 +390,10 @@ export function CheckoutPaymentClient({ subdomain }: { subdomain: string }) {
                 </p>
                 <form onSubmit={submitPix}>
                   <div className="checkout-nav-row">
-                    <Link href="/checkout/entrega" className="checkout-back">
+                    <Link
+                      href={storeHref(subdomain, "/checkout/entrega")}
+                      className="checkout-back"
+                    >
                       ← Voltar para entrega
                     </Link>
                     <button
@@ -402,7 +417,7 @@ export function CheckoutPaymentClient({ subdomain }: { subdomain: string }) {
                 ? "Retirada selecionada"
                 : "Entrega selecionada"}
             </strong>
-            <Link href="/checkout/entrega">Alterar</Link>
+            <Link href={storeHref(subdomain, "/checkout/entrega")}>Alterar</Link>
           </div>
         </section>
 

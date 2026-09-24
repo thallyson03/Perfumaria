@@ -13,6 +13,7 @@ type Props = {
   paidBanner?: boolean;
   backHref?: string;
   backLabel?: string;
+  ordersHref?: string;
   confirmationLayout?: boolean;
 };
 
@@ -22,6 +23,7 @@ export function OrderDetail({
   paidBanner,
   backHref,
   backLabel,
+  ordersHref = "/conta/pedidos",
   confirmationLayout,
 }: Props) {
   const productsSubtotal =
@@ -182,7 +184,7 @@ export function OrderDetail({
               <Link href={backHref} className="btn-outline">
                 {backLabel ?? "Voltar à vitrine"}
               </Link>
-              <Link href="/conta/pedidos" className="btn-primary">
+              <Link href={ordersHref} className="btn-primary">
                 Meus pedidos
               </Link>
             </div>

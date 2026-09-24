@@ -108,6 +108,7 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?defina NEXT_PUBLIC_API_URL}
         NEXT_PUBLIC_ROOT_DOMAIN: ${ROOT_DOMAIN:?defina ROOT_DOMAIN}
+        NEXT_PUBLIC_STORE_ROUTING: path
     restart: unless-stopped
     depends_on:
       - api
@@ -118,6 +119,7 @@ services:
       ROOT_DOMAIN: ${ROOT_DOMAIN}
       NEXT_PUBLIC_ROOT_DOMAIN: ${ROOT_DOMAIN}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NEXT_PUBLIC_STORE_ROUTING: path
     expose:
       - "3002"
     healthcheck:

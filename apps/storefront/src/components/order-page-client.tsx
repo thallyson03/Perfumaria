@@ -5,15 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { CheckoutShell } from "@/components/checkout/checkout-shell";
 import { OrderDetail } from "@/components/order-detail";
 import { fetchPublicOrder } from "@/lib/orders";
-
-const ROOT_DOMAIN =
-  process.env.NEXT_PUBLIC_ROOT_DOMAIN ??
-  process.env.ROOT_DOMAIN ??
-  "localhost";
-
-function tenantDomain(subdomain: string) {
-  return `${subdomain}.${ROOT_DOMAIN}`;
-}
+import { storeHref, tenantDomain } from "@/lib/store-url";
 
 export function OrderPageClient({
   subdomain,
@@ -49,11 +41,15 @@ export function OrderPageClient({
 
   if (error) {
     return (
-      <CheckoutShell current={4} storeName={storeName}>
+      <CheckoutShell
+        current={4}
+        storeName={storeName}
+        subdomain={subdomain}
+      >
         <div className="checkout-empty">
           <h1>Pedido não encontrado</h1>
           <p>{error}</p>
-          <a href="/" className="btn-primary">
+          <a href={storeHref(subdomain)} className="btn-primary">
             Voltar à vitrine
           </a>
         </div>
@@ -63,19 +59,24 @@ export function OrderPageClient({
 
   if (!order) {
     return (
-      <CheckoutShell current={4} storeName={storeName}>
+      <CheckoutShell
+        current={4}
+        storeName={storeName}
+        subdomain={subdomain}
+      >
         <p className="checkout-loading">Carregando pedido…</p>
       </CheckoutShell>
     );
   }
 
   return (
-    <CheckoutShell current={4} storeName={storeName}>
+    <CheckoutShell current={4} storeName={storeName} subdomain={subdomain}>
       <OrderDetail
         order={order}
         storeName={storeName}
         paidBanner={paidBanner}
-        backHref="/"
+        backHref={storeHref(subdomain)}
+        ordersHref={storeHref(subdomain, "/conta/pedidos")}
         backLabel="Voltar para a vitrine"
         confirmationLayout
       />

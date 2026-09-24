@@ -1,35 +1,51 @@
 "use client";
 
 import Link from "next/link";
-
-const STEPS = [
-  { id: 1, label: "Sacola de Compras", short: "Sacola", href: "/checkout" },
-  {
-    id: 2,
-    label: "Identificação & Entrega",
-    short: "Entrega",
-    href: "/checkout/entrega",
-  },
-  {
-    id: 3,
-    label: "Pagamento Seguro",
-    short: "Pagamento",
-    href: "/checkout/pagamento",
-  },
-  {
-    id: 4,
-    label: "Confirmação",
-    short: "Confirmação",
-    href: null,
-  },
-] as const;
+import { storeHref } from "@/lib/store-url";
 
 type Props = {
   current: 1 | 2 | 3 | 4;
   storeName: string;
+  subdomain: string;
 };
 
-export function CheckoutStepper({ current }: { current: 1 | 2 | 3 | 4 }) {
+function steps(subdomain: string) {
+  return [
+    {
+      id: 1,
+      label: "Sacola de Compras",
+      short: "Sacola",
+      href: storeHref(subdomain, "/checkout"),
+    },
+    {
+      id: 2,
+      label: "Identificação & Entrega",
+      short: "Entrega",
+      href: storeHref(subdomain, "/checkout/entrega"),
+    },
+    {
+      id: 3,
+      label: "Pagamento Seguro",
+      short: "Pagamento",
+      href: storeHref(subdomain, "/checkout/pagamento"),
+    },
+    {
+      id: 4,
+      label: "Confirmação",
+      short: "Confirmação",
+      href: null as string | null,
+    },
+  ] as const;
+}
+
+export function CheckoutStepper({
+  current,
+  subdomain,
+}: {
+  current: 1 | 2 | 3 | 4;
+  subdomain: string;
+}) {
+  const STEPS = steps(subdomain);
   return (
     <div className="checkout-stepper">
       <ol className="checkout-stepper-list">
@@ -81,13 +97,14 @@ export function CheckoutStepper({ current }: { current: 1 | 2 | 3 | 4 }) {
 export function CheckoutShell({
   current,
   storeName,
+  subdomain,
   children,
 }: Props & { children: React.ReactNode }) {
   return (
     <div className="checkout-page">
       <header className="checkout-header">
         <div className="checkout-header-inner">
-          <Link href="/" className="checkout-brand">
+          <Link href={storeHref(subdomain)} className="checkout-brand">
             <span className="checkout-brand-name">{storeName}</span>
             <span className="checkout-brand-tag">
               Checkout seguro · Alta perfumaria
@@ -99,7 +116,7 @@ export function CheckoutShell({
             <span>Atendimento exclusivo</span>
           </div>
         </div>
-        <CheckoutStepper current={current} />
+        <CheckoutStepper current={current} subdomain={subdomain} />
       </header>
       <main className="checkout-main">{children}</main>
       <footer className="checkout-footer">

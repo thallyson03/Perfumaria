@@ -10,6 +10,7 @@ import {
   saveCustomerSession,
   type CustomerSession,
 } from "@/lib/customer-session";
+import { storeHref } from "@/lib/store-url";
 
 type Props = {
   subdomain: string;
@@ -162,7 +163,10 @@ export function CustomerAuthMenu({ subdomain, domain, onSessionChange }: Props) 
                   <span>{session.customer.email}</span>
                 </div>
                 <div className="store-auth-panel-footer store-auth-panel-footer--stack">
-                  <a href="/conta/pedidos" className="store-auth-orders-link">
+                  <a
+                    href={storeHref(subdomain, "/conta/pedidos")}
+                    className="store-auth-orders-link"
+                  >
                     Meus pedidos
                   </a>
                   <button type="button" onClick={logout}>

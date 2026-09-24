@@ -27,6 +27,7 @@ import {
   type FulfillmentSelection,
   type ShippingQuote,
 } from "@/lib/delivery";
+import { storeHref } from "@/lib/store-url";
 
 type StoreConfig = StoreDeliveryConfig & {
   name: string;
@@ -58,7 +59,7 @@ export function CheckoutDeliveryClient({ subdomain }: { subdomain: string }) {
     const cart = loadCartItems(subdomain);
     setItems(cart);
     if (cart.length === 0) {
-      router.replace("/checkout");
+      router.replace(storeHref(subdomain, "/checkout"));
       return;
     }
 
@@ -139,11 +140,15 @@ export function CheckoutDeliveryClient({ subdomain }: { subdomain: string }) {
     }
     saveGuestDelivery(subdomain, fulfillment);
     persistCustomer();
-    router.push("/checkout/pagamento");
+    router.push(storeHref(subdomain, "/checkout/pagamento"));
   }
 
   return (
-    <CheckoutShell current={2} storeName={config?.name ?? subdomain}>
+    <CheckoutShell
+      current={2}
+      storeName={config?.name ?? subdomain}
+      subdomain={subdomain}
+    >
       {message && <div className="checkout-toast">{message}</div>}
       <div className="checkout-grid">
         <section className="checkout-col">
@@ -203,7 +208,7 @@ export function CheckoutDeliveryClient({ subdomain }: { subdomain: string }) {
             {!session && (
               <p className="checkout-hint">
                 Já tem conta?{" "}
-                <Link href="/">Entre na loja</Link> para preencher automaticamente
+                <Link href={storeHref(subdomain)}>Entre na loja</Link> para preencher automaticamente
                 e salvar endereços.
               </p>
             )}
@@ -229,7 +234,7 @@ export function CheckoutDeliveryClient({ subdomain }: { subdomain: string }) {
           </div>
 
           <div className="checkout-nav-row">
-            <Link href="/checkout" className="checkout-back">
+            <Link href={storeHref(subdomain, "/checkout")} className="checkout-back">
               ← Voltar para a sacola
             </Link>
             <button
