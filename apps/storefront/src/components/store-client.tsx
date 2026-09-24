@@ -668,7 +668,7 @@ export function StoreClient({ subdomain }: { subdomain: string }) {
             </span>
             <input
               type="search"
-              placeholder="Buscar por fragrância, notas olfativas…"
+              placeholder="Buscar fragrâncias…"
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
