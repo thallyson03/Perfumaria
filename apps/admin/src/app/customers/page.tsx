@@ -328,17 +328,17 @@ export default function CustomersPage() {
                   <tbody>
                     {filtered.map((c) => (
                       <tr key={c.id}>
-                        <td>
+                        <td data-label="Cliente">
                           <div className="crm-name">{c.fullName}</div>
                           <div className="crm-meta">
                             CPF {maskCpf(c.documentCpf)}
                           </div>
                         </td>
-                        <td>
+                        <td data-label="Contato">
                           <div>{c.phone ?? "Sem telefone"}</div>
                           <div className="crm-meta">{c.email ?? "Sem e-mail"}</div>
                         </td>
-                        <td>
+                        <td data-label="Situação">
                           {c.overdueDebt > 0 ? (
                             <span className="crm-pill crm-pill--danger">
                               Em atraso
@@ -351,7 +351,7 @@ export default function CustomersPage() {
                             <span className="crm-pill">Em dia</span>
                           )}
                         </td>
-                        <td>
+                        <td data-label="Dívida">
                           <span
                             className={`crm-debt ${
                               c.totalDebt > 0 ? "is-bad" : ""
@@ -365,7 +365,7 @@ export default function CustomersPage() {
                             </div>
                           )}
                         </td>
-                        <td style={{ textAlign: "right" }}>
+                        <td data-label="Ações" style={{ textAlign: "right" }}>
                           <Link
                             href={`/customers/${c.id}`}
                             className="crm-link"

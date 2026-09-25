@@ -9,6 +9,7 @@ import {
   mediaUrl,
   useAuthSession,
 } from "@/components/admin-shell";
+import { BarcodeScanner } from "@/components/barcode-scanner";
 import { receiptPath } from "@/components/sale-receipt";
 
 type Customer = {
@@ -135,6 +136,7 @@ export default function SalesPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [lastInvoiceId, setLastInvoiceId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const barcodeRef = useRef<HTMLInputElement>(null);
 
   const total = useMemo(
@@ -583,6 +585,13 @@ export default function SalesPage() {
                     />
                     <span className="pdv-scan-hint">Enter · F2</span>
                   </div>
+                  <button
+                    type="button"
+                    className="pdv-scan-cam"
+                    onClick={() => setScannerOpen(true)}
+                  >
+                    Câmera
+                  </button>
                   <input
                     value={catalogQuery}
                     onChange={(e) => setCatalogQuery(e.target.value)}
@@ -1008,6 +1017,15 @@ export default function SalesPage() {
 
       {error && <div className="pdv-toast pdv-toast--err">{error}</div>}
       {msg && <div className="pdv-toast pdv-toast--ok">{msg}</div>}
+      <BarcodeScanner
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onDetected={(code) => {
+          setScannerOpen(false);
+          setBarcode(code);
+          void lookupBarcode(code);
+        }}
+      />
     </AdminShell>
   );
 }

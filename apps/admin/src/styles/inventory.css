@@ -640,6 +640,18 @@
   grid-column: 1 / -1;
 }
 
+.inv-field .pdv-scan-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.inv-kit-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 5rem auto;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
 .inv-hint {
   font-size: 0.72rem;
   color: var(--at-muted);
@@ -678,17 +690,15 @@
   }
 
   .atelier-aside {
-    position: static;
-    height: auto;
-    border-right: 0;
-    border-bottom: 1px solid rgba(220, 192, 193, 0.4);
+    display: none;
   }
 
   .inv-kpis {
     grid-template-columns: 1fr;
   }
 
-  .inv-modal-grid {
+  .inv-modal-grid,
+  .inv-kit-row {
     grid-template-columns: 1fr;
   }
 }

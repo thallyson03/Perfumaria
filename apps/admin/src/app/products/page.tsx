@@ -3,6 +3,8 @@
 import "@/styles/inventory.css";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { BarcodeScanner } from "@/components/barcode-scanner";
+import { PhotoField } from "@/components/photo-field";
 import {
   AdminShell,
   apiFetch,
@@ -103,6 +105,7 @@ export default function ProductsPage() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [lookupMsg, setLookupMsg] = useState<string | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const barcodeRef = useRef<HTMLInputElement>(null);
 
   // batch
@@ -629,7 +632,7 @@ export default function ProductsPage() {
 
                   return (
                     <tr key={p.id}>
-                      <td>
+                      <td data-label="Produto">
                         <div className="inv-product-cell">
                           <div className="inv-thumb">
                             {img ? (
@@ -657,7 +660,7 @@ export default function ProductsPage() {
                           </div>
                         </div>
                       </td>
-                      <td>
+                      <td data-label="Lote">
                         {isKit ? (
                           <div className="inv-lot">
                             <span className="inv-product-meta">
@@ -710,7 +713,7 @@ export default function ProductsPage() {
                           <span className="inv-product-meta">Sem lotes</span>
                         )}
                       </td>
-                      <td>
+                      <td data-label="Estoque">
                         <div className="inv-stock">
                           <div className="inv-stock-bar">
                             <div
@@ -732,7 +735,7 @@ export default function ProductsPage() {
                           </div>
                         </div>
                       </td>
-                      <td>
+                      <td data-label="Preço">
                         <div className="inv-prices">
                           <span>Custo {formatBrl(costNum)}</span>
                           {p.onSale && list > sale ? (
@@ -745,7 +748,7 @@ export default function ProductsPage() {
                           )}
                         </div>
                       </td>
-                      <td>
+                      <td data-label="Margem">
                         <span
                           className={`inv-margin ${
                             marginPct < 20 || costNum <= 0 ? "is-bad" : ""
@@ -756,7 +759,7 @@ export default function ProductsPage() {
                             : "—"}
                         </span>
                       </td>
-                      <td>
+                      <td data-label="Ações">
                         <div className="inv-row-actions">
                           {isKit ? (
                             <button
@@ -803,25 +806,35 @@ export default function ProductsPage() {
             onSubmit={createProduct}
           >
             <h2>Cadastrar novo produto</h2>
-            <label className="inv-field inv-field--full">
+            <div className="inv-field inv-field--full">
               Código de barras
-              <input
-                ref={barcodeRef}
-                value={barcode}
-                onChange={(e) => setBarcode(e.target.value.replace(/\s/g, ""))}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    void lookupBarcode(barcode);
-                  }
-                }}
-                placeholder="Escaneie ou digite e Enter"
-                autoComplete="off"
-              />
+              <div className="pdv-scan-row">
+                <input
+                  ref={barcodeRef}
+                  value={barcode}
+                  onChange={(e) => setBarcode(e.target.value.replace(/\s/g, ""))}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void lookupBarcode(barcode);
+                    }
+                  }}
+                  placeholder="Escaneie ou digite e Enter"
+                  autoComplete="off"
+                  inputMode="numeric"
+                />
+                <button
+                  type="button"
+                  className="inv-scan-cam"
+                  onClick={() => setScannerOpen(true)}
+                >
+                  Câmera
+                </button>
+              </div>
               <span className="inv-hint">
-                Leitor USB digita o código e envia Enter.
+                Leitor USB, digitação ou câmera do celular.
               </span>
-            </label>
+            </div>
             {lookupMsg && <p className="inv-hint">{lookupMsg}</p>}
             <label className="inv-field inv-field--full">
               Nome
@@ -836,16 +849,13 @@ export default function ProductsPage() {
                 SKU
                 <input value={sku} onChange={(e) => setSku(e.target.value)} />
               </label>
-              <label className="inv-field">
-                Imagem
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  onChange={(e) =>
-                    void onImageChange(e.target.files?.[0] ?? null)
-                  }
+              <div className="inv-field inv-field--full">
+                <PhotoField
+                  uploading={uploading}
+                  previewUrl={mediaUrl(imageUrl)}
+                  onFile={(file) => void onImageChange(file)}
                 />
-              </label>
+              </div>
               <label className="inv-field">
                 Preço de venda *
                 <input
@@ -888,14 +898,6 @@ export default function ProductsPage() {
               </label>
             </div>
             {uploading && <p className="inv-hint">Enviando imagem…</p>}
-            {imageUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={mediaUrl(imageUrl) ?? undefined}
-                alt=""
-                className="inv-preview"
-              />
-            )}
             <div className="inv-modal-actions">
               <button type="button" className="inv-btn" onClick={closeModal}>
                 Cancelar
@@ -1082,29 +1084,20 @@ export default function ProductsPage() {
                 required
               />
             </label>
-            <label className="inv-field inv-field--full">
-              Imagem (opcional)
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => onImageChange(e.target.files?.[0] ?? null)}
+            <div className="inv-field inv-field--full">
+              <PhotoField
+                uploading={uploading}
+                previewUrl={mediaUrl(imageUrl)}
+                onFile={(file) => void onImageChange(file)}
+                label="Foto do kit"
               />
-              {uploading && <span>Enviando…</span>}
-              {imageUrl && <span>Imagem ok</span>}
-            </label>
+              {uploading && <span className="inv-hint">Enviando…</span>}
+            </div>
 
             <div className="inv-field inv-field--full">
               <strong>Componentes</strong>
               {kitRows.map((row, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 5rem auto",
-                    gap: "0.5rem",
-                    marginTop: "0.5rem",
-                  }}
-                >
+                <div key={idx} className="inv-kit-row">
                   <select
                     value={row.componentProductId}
                     onChange={(e) =>
@@ -1184,6 +1177,15 @@ export default function ProductsPage() {
 
       {error && <div className="inv-toast">{error}</div>}
       {msg && <div className="inv-toast inv-toast--ok">{msg}</div>}
+      <BarcodeScanner
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onDetected={(code) => {
+          setScannerOpen(false);
+          setBarcode(code);
+          void lookupBarcode(code);
+        }}
+      />
     </AdminShell>
   );
 }

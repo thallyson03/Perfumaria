@@ -42,6 +42,11 @@ export function AdminShell({
 }) {
   const { tenant, ready, logout } = useAuthSession();
   const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
 
   if (!ready) {
     return (
@@ -59,11 +64,35 @@ export function AdminShell({
     { href: "/settings", label: "Canais" },
   ];
 
+  const navLinks = (linkClass: string, activeClass: string) =>
+    nav.map((item) => {
+      const active =
+        pathname === item.href || pathname.startsWith(item.href + "/");
+      return (
+        <Link
+          key={item.href}
+          href={item.href}
+          className={active ? `${linkClass} ${activeClass}` : linkClass}
+        >
+          {item.label}
+        </Link>
+      );
+    });
+
   if (variant === "pos") {
     return (
       <div className="pdv-shell">
         <header className="pdv-topbar">
           <div className="pdv-topbar-brand">
+            <button
+              type="button"
+              className="nav-burger"
+              aria-label={menuOpen ? "Fechar menu" : "Abrir menu"}
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((v) => !v)}
+            >
+              {menuOpen ? "✕" : "☰"}
+            </button>
             <Link href="/dashboard" className="pdv-logo">
               {tenant?.name ?? "Revendedor"}
             </Link>
@@ -73,19 +102,7 @@ export function AdminShell({
             </span>
           </div>
           <nav className="pdv-topbar-nav">
-            {nav.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={
-                  pathname === item.href || pathname.startsWith(item.href + "/")
-                    ? "pdv-topbar-link active"
-                    : "pdv-topbar-link"
-                }
-              >
-                {item.label}
-              </Link>
-            ))}
+            {navLinks("pdv-topbar-link", "active")}
           </nav>
           <div className="pdv-topbar-actions">
             <span className="pdv-topbar-sub">{tenant?.subdomain}</span>
@@ -94,6 +111,19 @@ export function AdminShell({
             </button>
           </div>
         </header>
+        {menuOpen && (
+          <div className="nav-drawer-backdrop" onClick={() => setMenuOpen(false)}>
+            <nav
+              className="nav-drawer"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {navLinks("nav-drawer-link", "active")}
+              <button type="button" className="nav-drawer-logout" onClick={logout}>
+                Sair
+              </button>
+            </nav>
+          </div>
+        )}
         <div className="pdv-workspace">{children}</div>
       </div>
     );
@@ -102,6 +132,39 @@ export function AdminShell({
   if (variant === "atelier") {
     return (
       <div className="atelier-shell">
+        <header className="mobile-topbar">
+          <button
+            type="button"
+            className="nav-burger"
+            aria-label={menuOpen ? "Fechar menu" : "Abrir menu"}
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((v) => !v)}
+          >
+            {menuOpen ? "✕" : "☰"}
+          </button>
+          <span className="mobile-topbar-title">
+            {tenant?.name ?? "Revendedor"}
+          </span>
+          <Link href="/sales" className="mobile-topbar-pdv">
+            PDV
+          </Link>
+        </header>
+        {menuOpen && (
+          <div className="nav-drawer-backdrop" onClick={() => setMenuOpen(false)}>
+            <nav
+              className="nav-drawer"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {navLinks("nav-drawer-link", "active")}
+              <Link href="/sales" className="nav-drawer-cta">
+                Abrir PDV
+              </Link>
+              <button type="button" className="nav-drawer-logout" onClick={logout}>
+                Sair
+              </button>
+            </nav>
+          </div>
+        )}
         <aside className="atelier-aside">
           <div className="atelier-brand-block">
             <div className="atelier-brand-mark">◈</div>
@@ -111,19 +174,7 @@ export function AdminShell({
             </div>
           </div>
           <nav className="atelier-nav">
-            {nav.map((item) => {
-              const active =
-                pathname === item.href || pathname.startsWith(item.href + "/");
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={active ? "atelier-nav-link active" : "atelier-nav-link"}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
+            {navLinks("atelier-nav-link", "active")}
           </nav>
           <div className="atelier-aside-foot">
             <Link href="/sales" className="atelier-aside-cta">
@@ -140,8 +191,30 @@ export function AdminShell({
   }
 
   return (
-    <div style={shellStyles.layout}>
-      <aside style={shellStyles.aside}>
+    <div className="legacy-shell" style={shellStyles.layout}>
+      <header className="legacy-topbar">
+        <button
+          type="button"
+          className="nav-burger"
+          aria-label={menuOpen ? "Fechar menu" : "Abrir menu"}
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((v) => !v)}
+        >
+          {menuOpen ? "✕" : "☰"}
+        </button>
+        <span className="legacy-topbar-title">{tenant?.name ?? "Loja"}</span>
+      </header>
+      {menuOpen && (
+        <div className="nav-drawer-backdrop" onClick={() => setMenuOpen(false)}>
+          <nav className="nav-drawer" onClick={(e) => e.stopPropagation()}>
+            {navLinks("nav-drawer-link", "active")}
+            <button type="button" className="nav-drawer-logout" onClick={logout}>
+              Sair
+            </button>
+          </nav>
+        </div>
+      )}
+      <aside className="legacy-aside" style={shellStyles.aside}>
         <p style={shellStyles.brand}>Revendedor</p>
         <p style={shellStyles.store}>{tenant?.name ?? "Loja"}</p>
         <p style={shellStyles.sub}>{tenant?.subdomain}</p>
@@ -163,7 +236,9 @@ export function AdminShell({
           Sair
         </button>
       </aside>
-      <main style={shellStyles.main}>{children}</main>
+      <main className="legacy-main" style={shellStyles.main}>
+        {children}
+      </main>
     </div>
   );
 }

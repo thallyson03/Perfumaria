@@ -343,7 +343,7 @@ export default function DashboardPage() {
                         <tbody>
                           {summary.recentInvoices.map((inv) => (
                             <tr key={inv.id}>
-                              <td>
+                              <td data-label="Data">
                                 {new Date(inv.createdAt).toLocaleString(
                                   "pt-BR",
                                   {
@@ -352,8 +352,8 @@ export default function DashboardPage() {
                                   }
                                 )}
                               </td>
-                              <td>{inv.customerName}</td>
-                              <td>
+                              <td data-label="Cliente">{inv.customerName}</td>
+                              <td data-label="Status">
                                 <span
                                   className={`dash-pill ${
                                     inv.paidHint === "Pago"
@@ -364,7 +364,7 @@ export default function DashboardPage() {
                                   {inv.paidHint}
                                 </span>
                               </td>
-                              <td>
+                              <td data-label="Valor">
                                 <span className="dash-amount dash-amount--in">
                                   {formatBrl(inv.totalAmount)}
                                 </span>

@@ -397,7 +397,7 @@ export default function FinancePage() {
                             className={selectedId === r.id ? "selected" : ""}
                             onClick={() => setSelectedId(r.id)}
                           >
-                            <td>
+                            <td data-label="Cliente">
                               <div className="fin-customer">
                                 {r.customer.fullName}
                               </div>
@@ -410,8 +410,8 @@ export default function FinancePage() {
                                   : ""}
                               </div>
                             </td>
-                            <td>#{r.installmentNumber}</td>
-                            <td>
+                            <td data-label="Parcela">#{r.installmentNumber}</td>
+                            <td data-label="Vencimento">
                               {r.dueDate.slice(0, 10)}
                               {r.status !== "paid" && (
                                 <div className="fin-meta">
@@ -423,12 +423,12 @@ export default function FinancePage() {
                                 </div>
                               )}
                             </td>
-                            <td>
+                            <td data-label="Valor">
                               <span className="fin-amount">
                                 {formatBrl(Number(r.amount))}
                               </span>
                             </td>
-                            <td>
+                            <td data-label="Status">
                               <span
                                 className={`fin-pill ${statusClass(
                                   r.status,
