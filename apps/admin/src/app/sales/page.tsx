@@ -36,6 +36,7 @@ type Product = {
   imageUrl: string | null;
   kind?: "simple" | "kit";
   price: string;
+  cost?: string | number;
   effectivePrice?: number;
   listPrice?: number;
   onSale?: boolean;
@@ -66,6 +67,7 @@ type CartLine = {
   productName: string;
   sku: string | null;
   unitPrice: number;
+  cost: number;
   listPrice: number;
   onSale: boolean;
   quantity: number;
@@ -131,6 +133,7 @@ export default function SalesPage() {
   const [payMethod, setPayMethod] = useState<PayMethod>("pix");
   const [installments, setInstallments] = useState("1");
   const [payNow, setPayNow] = useState(true);
+  const [sellAtCost, setSellAtCost] = useState(false);
   const [useWalletAmount, setUseWalletAmount] = useState("0");
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -139,9 +142,13 @@ export default function SalesPage() {
   const [scannerOpen, setScannerOpen] = useState(false);
   const barcodeRef = useRef<HTMLInputElement>(null);
 
+  function linePrice(line: CartLine) {
+    return sellAtCost ? line.cost : line.unitPrice;
+  }
+
   const total = useMemo(
-    () => cart.reduce((s, line) => s + line.unitPrice * line.quantity, 0),
-    [cart]
+    () => cart.reduce((s, line) => s + linePrice(line) * line.quantity, 0),
+    [cart, sellAtCost]
   );
   const itemCount = useMemo(
     () => cart.reduce((s, line) => s + line.quantity, 0),
@@ -290,6 +297,7 @@ export default function SalesPage() {
           productName: allocation.kitName || product.name,
           sku: product.sku,
           unitPrice: allocation.unitPrice,
+          cost: Number(product.cost) || allocation.unitPrice,
           listPrice: product.listPrice ?? Number(product.price),
           onSale: Boolean(product.onSale),
           quantity: nextKitQty,
@@ -360,6 +368,7 @@ export default function SalesPage() {
           productName: product.name,
           sku: product.sku,
           unitPrice,
+          cost: Number(product.cost) || unitPrice,
           listPrice,
           onSale: Boolean(product.onSale),
           quantity: 1,
@@ -445,6 +454,7 @@ export default function SalesPage() {
 
   function clearSale() {
     setCart([]);
+    setSellAtCost(false);
     setUseWalletAmount("0");
     setBarcode("");
     setError(null);
@@ -482,18 +492,31 @@ export default function SalesPage() {
           customerId,
           items: cart.flatMap((l) => {
             if (l.kind === "kit" && l.components?.length) {
-              return l.components.map((c) => ({
-                batchId: c.batchId,
-                quantity: c.quantity,
-                unitPrice: c.unitPrice,
-                productName: c.productName,
-              }));
+              const target = Number((linePrice(l) * l.quantity).toFixed(2));
+              const base = l.components.reduce((s, c) => s + c.lineTotal, 0);
+              let allocated = 0;
+              return l.components.map((c, index) => {
+                const isLast = index === l.components!.length - 1;
+                const lineTotal =
+                  !sellAtCost || base <= 0
+                    ? c.lineTotal
+                    : isLast
+                      ? Number((target - allocated).toFixed(2))
+                      : Number((c.lineTotal * (target / base)).toFixed(2));
+                allocated += lineTotal;
+                return {
+                  batchId: c.batchId,
+                  quantity: c.quantity,
+                  unitPrice: Number((lineTotal / c.quantity).toFixed(4)),
+                  productName: c.productName,
+                };
+              });
             }
             return [
               {
                 batchId: l.batchId,
                 quantity: l.quantity,
-                unitPrice: l.unitPrice,
+                unitPrice: linePrice(l),
                 productName: l.productName,
               },
             ];
@@ -511,6 +534,7 @@ export default function SalesPage() {
       );
       setLastInvoiceId(result.invoiceId as string);
       setCart([]);
+      setSellAtCost(false);
       setBarcode("");
       setUseWalletAmount("0");
       await Promise.all([
@@ -814,11 +838,12 @@ export default function SalesPage() {
                     </h3>
                     <div className="pdv-line-meta">
                       {line.kind === "kit"
-                        ? `${formatBrl(line.unitPrice)} / kit`
-                        : `${line.sku ? `SKU ${line.sku} · ` : ""}Unit. ${formatBrl(line.unitPrice)}`}
-                      {line.onSale && line.listPrice > line.unitPrice
+                        ? `${formatBrl(linePrice(line))} / kit`
+                        : `${line.sku ? `SKU ${line.sku} · ` : ""}${sellAtCost ? "Custo" : "Unit."} ${formatBrl(linePrice(line))}`}
+                      {!sellAtCost && line.onSale && line.listPrice > line.unitPrice
                         ? " · promo"
                         : ""}
+                      {sellAtCost ? " · preço de custo" : ""}
                     </div>
                     {line.kind === "kit" && line.components && (
                       <div
@@ -858,7 +883,7 @@ export default function SalesPage() {
                     </div>
                   </div>
                   <div className="pdv-line-total">
-                    {formatBrl(line.unitPrice * line.quantity)}
+                    {formatBrl(linePrice(line) * line.quantity)}
                   </div>
                 </div>
               ))
@@ -926,6 +951,14 @@ export default function SalesPage() {
                   />
                 </label>
               )}
+              <label className="pdv-field pdv-field--check">
+                <input
+                  type="checkbox"
+                  checked={sellAtCost}
+                  onChange={(e) => setSellAtCost(e.target.checked)}
+                />
+                Vender a preço de custo
+              </label>
               <label className="pdv-field pdv-field--check">
                 <input
                   type="checkbox"
