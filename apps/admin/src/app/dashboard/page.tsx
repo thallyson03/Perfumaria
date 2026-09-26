@@ -223,6 +223,27 @@ export default function DashboardPage() {
               <article className="dash-kpi">
                 <div className="dash-kpi-top">
                   <div>
+                    <p className="dash-kpi-label">
+                      {period === "today"
+                        ? "Custo de hoje"
+                        : period === "month"
+                          ? "Custo do mês"
+                          : "Custo total"}
+                    </p>
+                    <p className="dash-kpi-value">
+                      {formatBrl(focus.totalCost)}
+                    </p>
+                  </div>
+                  <span className="dash-kpi-icon">▾</span>
+                </div>
+                <div className="dash-kpi-foot">
+                  <span>Custo dos produtos vendidos no período</span>
+                </div>
+              </article>
+
+              <article className="dash-kpi">
+                <div className="dash-kpi-top">
+                  <div>
                     <p className="dash-kpi-label">Lucro líquido</p>
                     <p
                       className={`dash-kpi-value ${

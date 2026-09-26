@@ -288,6 +288,7 @@ export default function ProductsPage() {
   }
 
   function openProductModal() {
+    setImageUrl(null);
     setModal("product");
     setError(null);
     setLookupMsg(null);
@@ -310,6 +311,7 @@ export default function ProductsPage() {
         : ""
     );
     setEditSalePriceUntil(toDateInputValue(product.salePriceUntil));
+    setImageUrl(product.imageUrl);
     setModal("edit");
     setError(null);
   }
@@ -471,6 +473,7 @@ export default function ProductsPage() {
           cost: costNum,
           salePrice: saleNum,
           salePriceUntil: saleNum ? promoEndIso(editSalePriceUntil) : null,
+          imageUrl: imageUrl || null,
         }),
       });
       closeModal();
@@ -980,7 +983,15 @@ export default function ProductsPage() {
             onClick={(e) => e.stopPropagation()}
             onSubmit={saveEdit}
           >
-            <h2>Editar preço, custo e promoção</h2>
+            <h2>Editar preço, custo, promoção e foto</h2>
+            <div className="inv-field inv-field--full">
+              <PhotoField
+                uploading={uploading}
+                previewUrl={mediaUrl(imageUrl)}
+                onFile={(file) => void onImageChange(file)}
+              />
+              {uploading && <span className="inv-hint">Enviando…</span>}
+            </div>
             <div className="inv-modal-grid">
               <label className="inv-field">
                 Preço de venda
