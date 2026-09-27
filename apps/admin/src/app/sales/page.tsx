@@ -105,6 +105,24 @@ function formatBrl(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function isoInDays(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function dueLabel(iso: string, extraDays: number) {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return "";
+  return new Date(Date.UTC(y, m - 1, d + extraDays)).toLocaleDateString(
+    "pt-BR",
+    { timeZone: "UTC" }
+  );
+}
+
 function maskCpf(cpf: string | null | undefined) {
   if (!cpf) return null;
   const d = cpf.replace(/\D/g, "");
@@ -134,6 +152,7 @@ export default function SalesPage() {
   const [installments, setInstallments] = useState("1");
   const [payNow, setPayNow] = useState(true);
   const [sellAtCost, setSellAtCost] = useState(false);
+  const [firstDueDate, setFirstDueDate] = useState("");
   const [useWalletAmount, setUseWalletAmount] = useState("0");
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -258,6 +277,7 @@ export default function SalesPage() {
     if (payMethod === "credit") {
       setPayNow(false);
       if (Number(installments) < 2) setInstallments("2");
+      setFirstDueDate((prev) => prev || isoInDays(30));
     } else {
       setPayNow(true);
       setInstallments("1");
@@ -481,6 +501,10 @@ export default function SalesPage() {
       setError("Selecione um cliente para finalizar a venda");
       return;
     }
+    if (payMethod === "credit" && !firstDueDate) {
+      setError("Informe o vencimento da primeira parcela");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     setMsg(null);
@@ -522,6 +546,7 @@ export default function SalesPage() {
             ];
           }),
           installments: Number(installments) || 1,
+          firstDueDate: payMethod === "credit" ? firstDueDate : undefined,
           payNow,
           useWalletAmount: wallet,
         }),
@@ -940,16 +965,41 @@ export default function SalesPage() {
 
             <div className="pdv-pay-extra">
               {payMethod === "credit" && (
-                <label className="pdv-field">
-                  Parcelas
-                  <input
-                    type="number"
-                    min={1}
-                    max={12}
-                    value={installments}
-                    onChange={(e) => setInstallments(e.target.value)}
-                  />
-                </label>
+                <>
+                  <label className="pdv-field">
+                    Parcelas
+                    <input
+                      type="number"
+                      min={1}
+                      max={12}
+                      value={installments}
+                      onChange={(e) => setInstallments(e.target.value)}
+                    />
+                  </label>
+                  <label className="pdv-field">
+                    Vencimento da 1ª parcela
+                    <input
+                      type="date"
+                      value={firstDueDate}
+                      onChange={(e) => setFirstDueDate(e.target.value)}
+                      required
+                    />
+                  </label>
+                  {firstDueDate && (
+                    <p className="pdv-line-meta" style={{ margin: 0 }}>
+                      {Array.from(
+                        {
+                          length: Math.min(
+                            12,
+                            Math.max(1, Number(installments) || 1)
+                          ),
+                        },
+                        (_, i) =>
+                          `${i + 1}ª ${dueLabel(firstDueDate, 30 * i)}`
+                      ).join(" · ")}
+                    </p>
+                  )}
+                </>
               )}
               <label className="pdv-field pdv-field--check">
                 <input
@@ -957,7 +1007,7 @@ export default function SalesPage() {
                   checked={sellAtCost}
                   onChange={(e) => setSellAtCost(e.target.checked)}
                 />
-                Vender a preço de custo
+                Compra a preço de custo
               </label>
               <label className="pdv-field pdv-field--check">
                 <input

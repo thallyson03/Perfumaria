@@ -38,6 +38,7 @@ const createSaleSchema = z.object({
     .min(1)
     .max(80),
   installments: z.number().int().min(1).max(12).default(1),
+  firstDueDate: z.string().date().optional(),
   payNow: z.boolean().optional().default(false),
   useWalletAmount: z.number().min(0).optional().default(0),
 });
@@ -78,6 +79,9 @@ export const financeRoutes: FastifyPluginAsync = async (app) => {
           installments: parsed.data.installments,
           payNow: parsed.data.payNow,
           useWalletAmount: parsed.data.useWalletAmount,
+          firstDueDate: parsed.data.firstDueDate
+            ? new Date(`${parsed.data.firstDueDate}T00:00:00.000Z`)
+            : undefined,
         });
       });
 

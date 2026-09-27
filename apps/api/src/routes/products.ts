@@ -673,5 +673,53 @@ export const productRoutes: FastifyPluginAsync = async (app) => {
         return reply.status(status).send({ error: message });
       }
     });
+
+    privateApp.patch("/:productId/batches/:batchId", async (req, reply) => {
+      const { productId, batchId } = req.params as {
+        productId: string;
+        batchId: string;
+      };
+      const parsed = createBatchSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return reply.status(400).send({ error: parsed.error.flatten() });
+      }
+      const tenantId = req.tenantId!;
+
+      try {
+        const batch = await withTenant(prisma, tenantId, async (tx) => {
+          const existing = await tx.productBatch.findFirst({
+            where: { id: batchId, productId },
+          });
+          if (!existing) return null;
+          if (parsed.data.quantity < existing.reservedQuantity) {
+            throw Object.assign(
+              new Error(
+                `A quantidade não pode ficar abaixo das ${existing.reservedQuantity} un. reservadas`
+              ),
+              { statusCode: 400 }
+            );
+          }
+          return tx.productBatch.update({
+            where: { id: existing.id },
+            data: {
+              batchNumber: parsed.data.batchNumber?.trim() || null,
+              expirationDate: new Date(`${parsed.data.expirationDate}T00:00:00.000Z`),
+              quantity: parsed.data.quantity,
+            },
+          });
+        });
+
+        if (!batch) return reply.status(404).send({ error: "Lote não encontrado" });
+        return reply.send(batch);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Falha ao atualizar lote";
+        const status =
+          err && typeof err === "object" && "statusCode" in err
+            ? Number((err as { statusCode: number }).statusCode)
+            : 500;
+        return reply.status(status).send({ error: message });
+      }
+    });
   });
 };

@@ -113,6 +113,8 @@ export default function ProductsPage() {
   const [batchNumber, setBatchNumber] = useState("");
   const [expirationDate, setExpirationDate] = useState("");
   const [quantity, setQuantity] = useState("10");
+  const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
+  const [editingReserved, setEditingReserved] = useState(0);
 
   // edit
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -297,6 +299,22 @@ export default function ProductsPage() {
 
   function openBatchModal(productId?: string) {
     if (productId) setSelectedProduct(productId);
+    setEditingBatchId(null);
+    setEditingReserved(0);
+    setBatchNumber("");
+    setExpirationDate("");
+    setQuantity("10");
+    setModal("batch");
+    setError(null);
+  }
+
+  function openEditBatch(productId: string, batch: Batch) {
+    setSelectedProduct(productId);
+    setEditingBatchId(batch.id);
+    setEditingReserved(batch.reservedQuantity);
+    setBatchNumber(batch.batchNumber ?? "");
+    setExpirationDate(toDateInputValue(batch.expirationDate));
+    setQuantity(String(batch.quantity));
     setModal("batch");
     setError(null);
   }
@@ -320,6 +338,8 @@ export default function ProductsPage() {
     setModal(null);
     setEditingId(null);
     setEditingKitId(null);
+    setEditingBatchId(null);
+    setEditingReserved(0);
   }
 
   async function onImageChange(file: File | null) {
@@ -415,21 +435,42 @@ export default function ProductsPage() {
     e.preventDefault();
     if (!token || !selectedProduct) return;
     setError(null);
+    const qty = Number(quantity);
+    if (!Number.isInteger(qty) || qty < 0) {
+      setError("Quantidade inválida.");
+      return;
+    }
+    if (editingBatchId && qty < editingReserved) {
+      setError(
+        `A quantidade não pode ficar abaixo das ${editingReserved} un. reservadas.`
+      );
+      return;
+    }
     try {
-      await apiFetch(`/v1/products/${selectedProduct}/batches`, token, {
-        method: "POST",
-        body: JSON.stringify({
-          batchNumber: batchNumber || undefined,
-          expirationDate,
-          quantity: Number(quantity),
-        }),
+      const body = JSON.stringify({
+        batchNumber: batchNumber || undefined,
+        expirationDate,
+        quantity: qty,
       });
+      if (editingBatchId) {
+        await apiFetch(
+          `/v1/products/${selectedProduct}/batches/${editingBatchId}`,
+          token,
+          { method: "PATCH", body }
+        );
+        flash("Lote atualizado");
+      } else {
+        await apiFetch(`/v1/products/${selectedProduct}/batches`, token, {
+          method: "POST",
+          body,
+        });
+        flash("Entrada de lote registrada");
+      }
       setBatchNumber("");
       setExpirationDate("");
       setQuantity("10");
       closeModal();
       await load(token);
-      flash("Entrada de lote registrada");
     } catch (err) {
       setError((err as Error).message);
     }
@@ -700,13 +741,31 @@ export default function ProductsPage() {
                             </span>
                             <span className="inv-product-meta">
                               Vence {batch.expirationDate.slice(0, 10)}
+                              {" · "}
+                              {batch.quantity} un
                             </span>
+                            <button
+                              type="button"
+                              className="inv-link"
+                              onClick={() => openEditBatch(p.id, batch)}
+                            >
+                              Editar lote
+                            </button>
                             {batches.length > 1 && (
                               <ul className="inv-batches-list">
-                                {batches.slice(0, 3).map((b) => (
+                                {batches
+                                  .filter((b) => b.id !== batch.id)
+                                  .map((b) => (
                                   <li key={b.id}>
                                     {b.batchNumber ?? "lote"} · {b.quantity} un ·{" "}
-                                    {b.expirationDate.slice(0, 10)}
+                                    {b.expirationDate.slice(0, 10)}{" "}
+                                    <button
+                                      type="button"
+                                      className="inv-link"
+                                      onClick={() => openEditBatch(p.id, b)}
+                                    >
+                                      Editar
+                                    </button>
                                   </li>
                                 ))}
                               </ul>
@@ -920,13 +979,20 @@ export default function ProductsPage() {
             onClick={(e) => e.stopPropagation()}
             onSubmit={createBatch}
           >
-            <h2>Dar entrada em lote</h2>
+            <h2>{editingBatchId ? "Editar lote" : "Dar entrada em lote"}</h2>
+            {editingBatchId && (
+              <p className="inv-hint">
+                Altera o lote existente. A quantidade informada substitui a
+                atual e não cria outra entrada.
+              </p>
+            )}
             <label className="inv-field inv-field--full">
               Produto
               <select
                 value={selectedProduct}
                 onChange={(e) => setSelectedProduct(e.target.value)}
                 required
+                disabled={Boolean(editingBatchId)}
               >
                 <option value="">Selecione</option>
                 {items.map((p) => (
@@ -948,7 +1014,7 @@ export default function ProductsPage() {
                 Quantidade
                 <input
                   type="number"
-                  min={1}
+                  min={editingBatchId ? editingReserved : 1}
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
                   required
@@ -969,7 +1035,7 @@ export default function ProductsPage() {
                 Cancelar
               </button>
               <button type="submit" className="inv-btn inv-btn--primary">
-                Registrar entrada
+                {editingBatchId ? "Salvar lote" : "Registrar entrada"}
               </button>
             </div>
           </form>

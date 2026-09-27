@@ -24,6 +24,8 @@ export type CreateSaleOptions = {
   useWalletAmount?: number;
   /** Dias entre parcelas (padrão 30) */
   daysBetweenInstallments?: number;
+  /** Vencimento da 1ª parcela. As seguintes somam o intervalo. */
+  firstDueDate?: Date;
 };
 
 export type CreateSaleResult = {
@@ -83,10 +85,17 @@ async function createInvoiceRecord(
   });
 }
 
+function addUtcDays(date: Date, days: number) {
+  const next = new Date(date.getTime());
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
 function buildInstallments(
   total: number,
   count: number,
-  daysBetween: number
+  daysBetween: number,
+  firstDueDate?: Date
 ): Array<{ installmentNumber: number; amount: number; dueDate: Date }> {
   const base = Math.floor((total / count) * 100) / 100;
   return Array.from({ length: count }, (_, i) => {
@@ -94,8 +103,13 @@ function buildInstallments(
       i === count - 1
         ? Math.round((total - base * (count - 1)) * 100) / 100
         : base;
-    const due = new Date();
-    due.setDate(due.getDate() + daysBetween * (i + 1));
+    let due: Date;
+    if (firstDueDate) {
+      due = addUtcDays(firstDueDate, daysBetween * i);
+    } else {
+      due = new Date();
+      due.setDate(due.getDate() + daysBetween * (i + 1));
+    }
     return { installmentNumber: i + 1, amount, dueDate: due };
   });
 }
@@ -164,7 +178,12 @@ export async function createSale(
     await commitBatchReservation(tx, item.batchId, item.quantity);
   }
 
-  const installmentRows = buildInstallments(total, installmentCount, daysBetween);
+  const installmentRows = buildInstallments(
+    total,
+    installmentCount,
+    daysBetween,
+    options.firstDueDate
+  );
   const invoice = await createInvoiceRecord(tx, {
     tenantId,
     customerId,
