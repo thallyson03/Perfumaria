@@ -1,12 +1,22 @@
 import type { Prisma } from "@prisma/client";
 import {
   commitBatchReservation,
+  consumeProductFifo,
   reserveBatchStock,
+  restoreProductStock,
 } from "./stock.js";
 import { getEffectivePrice } from "../lib/product-price.js";import { refreshCustomerDebt } from "./debt-summary.js";
 import { payReceivable } from "./finance.js";
 
 type Tx = Prisma.TransactionClient;
+
+export type SaleEditItemInput = {
+  batchId?: string;
+  productId?: string;
+  quantity: number;
+  unitPrice: number;
+  productName?: string;
+};
 
 export type SaleItemInput = {
   batchId: string;
@@ -216,4 +226,196 @@ export async function createSale(
   await refreshCustomerDebt(tx, tenantId, customerId);
 
   return { invoice, total, paidNow };
+}
+
+function money(value: number) {
+  return Number(value.toFixed(2));
+}
+
+/**
+ * Reabre uma venda do PDV: devolve o estoque antigo, aplica a cesta nova
+ * e recalcula só as parcelas ainda em aberto.
+ */
+export async function updateSale(
+  tx: Tx,
+  tenantId: string,
+  invoiceId: string,
+  items: SaleEditItemInput[],
+  options: CreateSaleOptions = {}
+): Promise<CreateSaleResult> {
+  if (items.length === 0) {
+    throw Object.assign(new Error("A venda precisa ter ao menos um produto"), {
+      statusCode: 400,
+    });
+  }
+
+  const invoice = await tx.invoice.findFirst({
+    where: { id: invoiceId },
+    include: { items: true, accountsReceivable: true },
+  });
+  if (!invoice || invoice.tenantId !== tenantId) {
+    throw Object.assign(new Error("Venda não encontrada"), { statusCode: 404 });
+  }
+  if (invoice.status === "canceled") {
+    throw Object.assign(new Error("Venda cancelada não pode ser editada"), {
+      statusCode: 409,
+    });
+  }
+
+  for (const item of invoice.items) {
+    if (!item.productId) continue;
+    await restoreProductStock(tx, item.productId, item.quantity);
+  }
+
+  let total = 0;
+  const lineItems: Array<{
+    productId: string;
+    productName: string;
+    quantity: number;
+    unitPrice: number;
+    lineTotal: number;
+  }> = [];
+
+  for (const item of items) {
+    const unitPrice = Number(item.unitPrice);
+    const lineTotal = money(unitPrice * item.quantity);
+    if (item.batchId) {
+      const ok = await reserveBatchStock(tx, item.batchId, item.quantity);
+      if (!ok) {
+        throw Object.assign(new Error("Estoque insuficiente para alterar a venda"), {
+          statusCode: 409,
+        });
+      }
+      const batch = await tx.productBatch.findFirst({
+        where: { id: item.batchId },
+        include: { product: true },
+      });
+      if (!batch || !batch.product.isActive) {
+        throw Object.assign(new Error("Lote ou produto inválido"), {
+          statusCode: 400,
+        });
+      }
+      await commitBatchReservation(tx, item.batchId, item.quantity);
+      total += lineTotal;
+      lineItems.push({
+        productId: batch.productId,
+        productName: item.productName?.trim() || batch.product.name,
+        quantity: item.quantity,
+        unitPrice,
+        lineTotal,
+      });
+      continue;
+    }
+
+    if (!item.productId) {
+      throw Object.assign(new Error("Produto da venda inválido"), {
+        statusCode: 400,
+      });
+    }
+    const product = await tx.product.findFirst({ where: { id: item.productId } });
+    if (!product || !product.isActive) {
+      throw Object.assign(new Error("Produto inválido ou inativo"), {
+        statusCode: 400,
+      });
+    }
+    await consumeProductFifo(tx, item.productId, item.quantity);
+    total += lineTotal;
+    lineItems.push({
+      productId: product.id,
+      productName: item.productName?.trim() || product.name,
+      quantity: item.quantity,
+      unitPrice,
+      lineTotal,
+    });
+  }
+
+  total = money(total);
+  const paidRows = invoice.accountsReceivable.filter((row) => row.status === "paid");
+  const paidSum = money(paidRows.reduce((sum, row) => sum + Number(row.amount), 0));
+  if (total + 0.009 < paidSum) {
+    throw Object.assign(
+      new Error(
+        `O novo total (${total.toFixed(2)}) ficou menor que o valor já recebido (${paidSum.toFixed(2)})`
+      ),
+      { statusCode: 409 }
+    );
+  }
+
+  await tx.invoiceItem.deleteMany({ where: { invoiceId: invoice.id } });
+  await tx.invoiceItem.createMany({
+    data: lineItems.map((line) => ({
+      tenantId,
+      invoiceId: invoice.id,
+      productId: line.productId,
+      productName: line.productName,
+      quantity: line.quantity,
+      unitPrice: line.unitPrice,
+      lineTotal: line.lineTotal,
+    })),
+  });
+
+  await tx.accountReceivable.deleteMany({
+    where: {
+      invoiceId: invoice.id,
+      status: { in: ["pending", "overdue"] },
+    },
+  });
+
+  const remaining = money(total - paidSum);
+  const installmentCount = Math.max(1, options.installments ?? 1);
+  const daysBetween = options.daysBetweenInstallments ?? 30;
+  let paidNow = 0;
+
+  if (remaining > 0.009) {
+    const rows = buildInstallments(
+      remaining,
+      installmentCount,
+      daysBetween,
+      options.firstDueDate
+    );
+    const start =
+      paidRows.reduce((max, row) => Math.max(max, row.installmentNumber), 0) + 1;
+    let walletLeft = options.useWalletAmount ?? 0;
+    for (const row of rows) {
+      const created = await tx.accountReceivable.create({
+        data: {
+          tenantId,
+          customerId: invoice.customerId,
+          invoiceId: invoice.id,
+          installmentNumber: start + row.installmentNumber - 1,
+          amount: row.amount,
+          dueDate: row.dueDate,
+          status: "pending",
+        },
+      });
+      if (options.payNow) {
+        const walletForThis = Math.min(walletLeft, Number(created.amount));
+        const paid = await payReceivable({
+          tx,
+          tenantId,
+          receivableId: created.id,
+          useWalletAmount: walletForThis,
+          description: "Pagamento na edição da venda",
+        });
+        walletLeft -= walletForThis;
+        paidNow += paid.amount;
+      }
+    }
+  }
+
+  const openCount = await tx.accountReceivable.count({
+    where: {
+      invoiceId: invoice.id,
+      status: { in: ["pending", "overdue"] },
+    },
+  });
+  const status = openCount === 0 ? "paid" : paidSum > 0 ? "partial" : "pending";
+  const updated = await tx.invoice.update({
+    where: { id: invoice.id },
+    data: { totalAmount: total, status },
+    include: { accountsReceivable: true, items: true },
+  });
+
+  await refreshCustomerDebt(tx, tenantId, invoice.customerId);
+  return { invoice: updated, total, paidNow };
 }

@@ -72,6 +72,8 @@ type CartLine = {
   onSale: boolean;
   quantity: number;
   maxQty: number;
+  /** Quantidade que já estava nesta venda. 0 se o item foi incluído agora. */
+  originQty: number;
   components?: KitComponentLine[];
 };
 
@@ -159,6 +161,11 @@ export default function SalesPage() {
   const [lastInvoiceId, setLastInvoiceId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [editInvoiceId, setEditInvoiceId] = useState<string | null>(null);
+  const [catalogReady, setCatalogReady] = useState(false);
+  const editLoaded = useRef<string | null>(null);
+  const productsRef = useRef(products);
+  productsRef.current = products;
   const barcodeRef = useRef<HTMLInputElement>(null);
 
   function linePrice(line: CartLine) {
@@ -197,6 +204,7 @@ export default function SalesPage() {
   const loadCatalog = useCallback(async (t: string) => {
     const data = (await apiFetch("/v1/products", t)) as Product[];
     setProducts(data);
+    setCatalogReady(true);
   }, []);
 
   const loadCustomers = useCallback(async (t: string) => {
@@ -229,12 +237,69 @@ export default function SalesPage() {
 
   useEffect(() => {
     if (!ready || !token) return;
+    const invoice = new URLSearchParams(window.location.search).get("invoice");
+    if (invoice) setEditInvoiceId(invoice);
     Promise.all([
       loadCatalog(token),
       loadCustomers(token),
       loadQueue(token),
     ]).catch((e: Error) => setError(e.message));
   }, [ready, token, loadCatalog, loadCustomers, loadQueue]);
+
+  useEffect(() => {
+    if (!token || !editInvoiceId || !catalogReady) return;
+    if (editLoaded.current === editInvoiceId) return;
+    let cancelled = false;
+    apiFetch(`/v1/finance/invoices/${editInvoiceId}`, token)
+      .then((data) => {
+        if (cancelled) return;
+        editLoaded.current = editInvoiceId;
+        const invoice = data as {
+          customerId: string;
+          items: Array<{
+            id: string;
+            productId: string | null;
+            productName: string;
+            quantity: number;
+            unitPrice: number;
+          }>;
+        };
+        setCustomerId(invoice.customerId);
+        setSellAtCost(false);
+        setCart(
+          invoice.items
+            .filter((item) => item.productId)
+            .map((item) => {
+              const product = productsRef.current.find(
+                (entry) => entry.id === item.productId
+              );
+              const available = product?.availableStock ?? 0;
+              return {
+                lineId: `edit:${item.id}`,
+                kind: "simple" as const,
+                batchId: `edit:${item.id}`,
+                productId: item.productId as string,
+                productName: item.productName,
+                sku: product?.sku ?? null,
+                unitPrice: item.unitPrice,
+                cost: Number(product?.cost) || item.unitPrice,
+                listPrice: product?.listPrice ?? item.unitPrice,
+                onSale: false,
+                quantity: item.quantity,
+                maxQty: item.quantity + available,
+                originQty: item.quantity,
+              };
+            })
+        );
+      })
+      .catch((err: Error) => {
+        editLoaded.current = null;
+        if (!cancelled) setError(err.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, editInvoiceId, catalogReady]);
 
   useEffect(() => {
     if (!token || !customerId) return;
@@ -322,6 +387,7 @@ export default function SalesPage() {
           onSale: Boolean(product.onSale),
           quantity: nextKitQty,
           maxQty: allocation.availableKits,
+          originQty: 0,
           components: allocation.components,
         };
         if (idx >= 0) {
@@ -351,6 +417,27 @@ export default function SalesPage() {
       }
       void addKitToCart(product, nextQty);
       return;
+    }
+    if (editInvoiceId) {
+      const origin = cart.find(
+        (line) =>
+          line.originQty > 0 &&
+          line.kind === "simple" &&
+          line.productId === product.id
+      );
+      if (origin && origin.quantity < origin.maxQty) {
+        setError(null);
+        setCart((prev) =>
+          prev.map((line) =>
+            line.lineId === origin.lineId
+              ? { ...line, quantity: line.quantity + 1 }
+              : line
+          )
+        );
+        setScanFlash(true);
+        setTimeout(() => setScanFlash(false), 450);
+        return;
+      }
     }
     const batch = pickFifoBatch(product.batches ?? []);
     if (!batch) {
@@ -393,6 +480,7 @@ export default function SalesPage() {
           onSale: Boolean(product.onSale),
           quantity: 1,
           maxQty,
+          originQty: 0,
         },
       ];
     });
@@ -510,11 +598,23 @@ export default function SalesPage() {
     setMsg(null);
     try {
       const wallet = payNow ? Number(useWalletAmount) || 0 : 0;
-      const result = await apiFetch("/v1/finance/sales", token, {
-        method: "POST",
-        body: JSON.stringify({
-          customerId,
-          items: cart.flatMap((l) => {
+      const items = cart.flatMap((l): Array<{
+        batchId?: string;
+        productId?: string;
+        quantity: number;
+        unitPrice: number;
+        productName: string;
+      }> => {
+            if (editInvoiceId && l.originQty > 0 && l.kind !== "kit") {
+              return [
+                {
+                  productId: l.productId,
+                  quantity: l.quantity,
+                  unitPrice: linePrice(l),
+                  productName: l.productName,
+                },
+              ];
+            }
             if (l.kind === "kit" && l.components?.length) {
               const target = Number((linePrice(l) * l.quantity).toFixed(2));
               const base = l.components.reduce((s, c) => s + c.lineTotal, 0);
@@ -544,7 +644,17 @@ export default function SalesPage() {
                 productName: l.productName,
               },
             ];
-          }),
+          });
+      const result = await apiFetch(
+        editInvoiceId
+          ? `/v1/finance/sales/${editInvoiceId}`
+          : "/v1/finance/sales",
+        token,
+        {
+          method: editInvoiceId ? "PATCH" : "POST",
+          body: JSON.stringify({
+          customerId,
+          items,
           installments: Number(installments) || 1,
           firstDueDate: payMethod === "credit" ? firstDueDate : undefined,
           payNow,
@@ -552,7 +662,7 @@ export default function SalesPage() {
         }),
       });
       setMsg(
-        `Venda registrada · ${formatBrl(Number(result.totalAmount))}` +
+        `${editInvoiceId ? "Venda atualizada" : "Venda registrada"} · ${formatBrl(Number(result.totalAmount))}` +
           (result.paidNow > 0
             ? ` · recebido ${formatBrl(Number(result.paidNow))}`
             : "")
@@ -560,6 +670,11 @@ export default function SalesPage() {
       setLastInvoiceId(result.invoiceId as string);
       setCart([]);
       setSellAtCost(false);
+      if (editInvoiceId) {
+        setEditInvoiceId(null);
+        editLoaded.current = null;
+        window.history.replaceState(null, "", "/sales");
+      }
       setBarcode("");
       setUseWalletAmount("0");
       await Promise.all([
@@ -811,7 +926,7 @@ export default function SalesPage() {
 
         <aside className="pdv-panel pdv-cart">
           <div className="pdv-cart-title">
-            <h2>Cesta do PDV</h2>
+            <h2>{editInvoiceId ? "Editar venda" : "Cesta do PDV"}</h2>
             <span className="pdv-pill">
               {itemCount} {itemCount === 1 ? "item" : "itens"}
             </span>
@@ -823,6 +938,7 @@ export default function SalesPage() {
               value={customerId}
               onChange={(e) => setCustomerId(e.target.value)}
               required
+              disabled={Boolean(editInvoiceId)}
             >
               <option value="">Selecione o cliente</option>
               {customers.map((c) => (
@@ -831,6 +947,12 @@ export default function SalesPage() {
                 </option>
               ))}
             </select>
+            {editInvoiceId && (
+              <div className="pdv-customer-meta">
+                Inclua produtos, diminua a quantidade ou remova itens. O
+                estoque e as parcelas em aberto são atualizados ao salvar.
+              </div>
+            )}
             {selectedCustomer && (
               <div className="pdv-customer-meta">
                 {selectedCustomer.documentCpf && (
@@ -1039,7 +1161,9 @@ export default function SalesPage() {
             >
               {submitting
                 ? "Registrando…"
-                : `Finalizar venda (F10) · ${formatBrl(total)}`}
+                : editInvoiceId
+                  ? `Salvar venda · ${formatBrl(total)}`
+                  : `Finalizar venda (F10) · ${formatBrl(total)}`}
             </button>
 
             <div className="pdv-btn-row">

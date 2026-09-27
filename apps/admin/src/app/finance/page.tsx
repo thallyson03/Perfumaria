@@ -537,14 +537,25 @@ export default function FinancePage() {
                   )}
 
                   {selected.status === "paid" && selected.invoice && (
-                    <Link
-                      href={receiptPath(selected.invoice.id)}
-                      target="_blank"
-                      className="inv-btn inv-btn--primary"
-                      style={{ textAlign: "center", textDecoration: "none" }}
-                    >
-                      Abrir comprovante
-                    </Link>
+                    <>
+                      <Link
+                        href={receiptPath(selected.invoice.id)}
+                        target="_blank"
+                        className="inv-btn inv-btn--primary"
+                        style={{ textAlign: "center", textDecoration: "none" }}
+                      >
+                        Abrir comprovante
+                      </Link>
+                      {selected.invoice.status !== "canceled" && (
+                        <Link
+                          href={`/sales?invoice=${selected.invoice.id}`}
+                          className="inv-btn"
+                          style={{ textAlign: "center", textDecoration: "none" }}
+                        >
+                          Editar venda
+                        </Link>
+                      )}
+                    </>
                   )}
                 </div>
                 {selected.status !== "paid" && (
@@ -572,6 +583,19 @@ export default function FinancePage() {
                         }}
                       >
                         Ver fatura / recibo
+                      </Link>
+                    )}
+                    {selected.invoice && selected.invoice.status !== "canceled" && (
+                      <Link
+                        href={`/sales?invoice=${selected.invoice.id}`}
+                        className="inv-btn"
+                        style={{
+                          width: "100%",
+                          textAlign: "center",
+                          textDecoration: "none",
+                        }}
+                      >
+                        Editar venda
                       </Link>
                     )}
                     <Link

@@ -54,6 +54,59 @@ export async function commitBatchReservation(
   `;
 }
 
+/** Devolve unidades vendidas ao lote que vence primeiro. */
+export async function restoreProductStock(
+  tx: Tx,
+  productId: string,
+  qty: number
+): Promise<void> {
+  if (qty <= 0) return;
+  const batch = await tx.productBatch.findFirst({
+    where: { productId },
+    orderBy: { expirationDate: "asc" },
+  });
+  if (!batch) {
+    throw Object.assign(
+      new Error("Não há lote para devolver o estoque deste produto"),
+      { statusCode: 409 }
+    );
+  }
+  await tx.productBatch.update({
+    where: { id: batch.id },
+    data: { quantity: { increment: qty } },
+  });
+}
+
+/**
+ * Baixa estoque em lotes que vencem primeiro.
+ */
+export async function consumeProductFifo(
+  tx: Tx,
+  productId: string,
+  qty: number
+): Promise<void> {
+  let need = qty;
+  const batches = await tx.productBatch.findMany({
+    where: { productId },
+    orderBy: { expirationDate: "asc" },
+  });
+  for (const batch of batches) {
+    if (need <= 0) break;
+    const available = batch.quantity - batch.reservedQuantity;
+    if (available <= 0) continue;
+    const take = Math.min(available, need);
+    const ok = await reserveBatchStock(tx, batch.id, take);
+    if (!ok) continue;
+    await commitBatchReservation(tx, batch.id, take);
+    need -= take;
+  }
+  if (need > 0) {
+    throw Object.assign(new Error("Estoque insuficiente para alterar a venda"), {
+      statusCode: 409,
+    });
+  }
+}
+
 /**
  * Libera reserva expirada / cancelada (Cart DoS rollback).
  */

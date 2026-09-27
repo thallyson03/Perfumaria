@@ -7,7 +7,7 @@ import {
   payReceivable,
 } from "../services/finance.js";
 import { refreshCustomerDebt } from "../services/debt-summary.js";
-import { createSale } from "../services/sale.js";
+import { createSale, updateSale } from "../services/sale.js";
 import { buildSaleReceipt } from "../services/receipt.js";
 
 const createInvoiceSchema = z.object({
@@ -24,6 +24,18 @@ const createInvoiceSchema = z.object({
     .min(1),
 });
 
+const saleItemSchema = z
+  .object({
+    batchId: z.string().uuid().optional(),
+    productId: z.string().uuid().optional(),
+    quantity: z.number().int().positive().max(500),
+    unitPrice: z.number().min(0).optional(),
+    productName: z.string().min(1).max(255).optional(),
+  })
+  .refine((item) => Boolean(item.batchId || item.productId), {
+    message: "Informe o lote ou o produto",
+  });
+
 const createSaleSchema = z.object({
   customerId: z.string().uuid(),
   items: z
@@ -37,6 +49,14 @@ const createSaleSchema = z.object({
     )
     .min(1)
     .max(80),
+  installments: z.number().int().min(1).max(12).default(1),
+  firstDueDate: z.string().date().optional(),
+  payNow: z.boolean().optional().default(false),
+  useWalletAmount: z.number().min(0).optional().default(0),
+});
+
+const updateSaleSchema = z.object({
+  items: z.array(saleItemSchema).min(1).max(80),
   installments: z.number().int().min(1).max(12).default(1),
   firstDueDate: z.string().date().optional(),
   payNow: z.boolean().optional().default(false),
@@ -97,6 +117,85 @@ export const financeRoutes: FastifyPluginAsync = async (app) => {
         items: result.invoice.items,
         installments: result.invoice.accountsReceivable,
       });
+    } catch (err) {
+      const e = err as Error & { statusCode?: number };
+      return reply.status(e.statusCode ?? 500).send({ error: e.message });
+    }
+  });
+
+  app.get("/invoices/:id", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const tenantId = req.tenantId!;
+    const invoice = await withTenant(prisma, tenantId, (tx) =>
+      tx.invoice.findFirst({
+        where: { id },
+        include: {
+          customer: {
+            select: { id: true, fullName: true, phone: true, documentCpf: true },
+          },
+          items: { orderBy: { productName: "asc" } },
+          accountsReceivable: { orderBy: { installmentNumber: "asc" } },
+        },
+      })
+    );
+    if (!invoice) {
+      return reply.status(404).send({ error: "Venda não encontrada" });
+    }
+    const paidAmount = invoice.accountsReceivable
+      .filter((row) => row.status === "paid")
+      .reduce((sum, row) => sum + Number(row.amount), 0);
+    return {
+      id: invoice.id,
+      customerId: invoice.customerId,
+      status: invoice.status,
+      totalAmount: Number(invoice.totalAmount),
+      paidAmount,
+      createdAt: invoice.createdAt,
+      customer: invoice.customer,
+      items: invoice.items.map((item) => ({
+        id: item.id,
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity,
+        unitPrice: Number(item.unitPrice),
+        lineTotal: Number(item.lineTotal),
+      })),
+    };
+  });
+
+  app.patch("/sales/:invoiceId", async (req, reply) => {
+    const { invoiceId } = req.params as { invoiceId: string };
+    const parsed = updateSaleSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.flatten() });
+    }
+    const tenantId = req.tenantId!;
+    try {
+      const result = await withTenant(prisma, tenantId, (tx) =>
+        updateSale(tx, tenantId, invoiceId, parsed.data.items.map((item) => ({
+          batchId: item.batchId,
+          productId: item.productId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice ?? 0,
+          productName: item.productName,
+        })), {
+          installments: parsed.data.installments,
+          payNow: parsed.data.payNow,
+          useWalletAmount: parsed.data.useWalletAmount,
+          firstDueDate: parsed.data.firstDueDate
+            ? new Date(`${parsed.data.firstDueDate}T00:00:00.000Z`)
+            : undefined,
+        })
+      );
+      if (result.paidNow > 0) {
+        await afterPaymentCommitted(tenantId, result.paidNow);
+      }
+      return {
+        invoiceId: result.invoice.id,
+        totalAmount: result.total,
+        paidNow: result.paidNow,
+        status: result.invoice.status,
+      };
     } catch (err) {
       const e = err as Error & { statusCode?: number };
       return reply.status(e.statusCode ?? 500).send({ error: e.message });
